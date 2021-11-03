@@ -34,7 +34,7 @@ class AMQPConsumer<T: Any>(
             runBlocking {
                 workersChannel.send(
                     AMQPMessage(
-                        payload.properties.headers.mapValues { it.toString() },
+                        payload.properties.headers.mapValues { it.value.toString() },
                         Json.decodeFromString(serializer, String(payload.body))
                     )
                 )
