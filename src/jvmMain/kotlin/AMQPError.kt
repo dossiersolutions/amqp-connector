@@ -23,3 +23,8 @@ class AMQPPublishingError(
     override val message: String,
     override val causes: Map<String, AMQPConnectionFactoryError> = emptyMap()
 ) : AMQPError()
+
+class AMQPConsumingError(
+    override val message: String,
+    override val causes: Map<String, AMQPConnectionFactoryError> = emptyMap()
+) : AMQPError()

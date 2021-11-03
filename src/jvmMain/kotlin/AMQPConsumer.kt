@@ -33,7 +33,10 @@ class AMQPConsumer<T: Any>(
         amqpChannel.basicConsume(queueName, true, { consumerTag, payload ->
             runBlocking {
                 workersChannel.send(
-                    AMQPMessage(Json.decodeFromString(serializer, String(payload.body)))
+                    AMQPMessage(
+                        payload.properties.headers.mapValues { it.toString() },
+                        Json.decodeFromString(serializer, String(payload.body))
+                    )
                 )
             }
         }, { consumerTag ->
