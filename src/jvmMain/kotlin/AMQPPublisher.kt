@@ -8,6 +8,7 @@ import kotlinx.serialization.json.Json
 import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Result
 import no.dossier.libraries.functional.Success
+import no.dossier.libraries.functional.andThen
 import java.io.IOException
 
 class AMQPPublisher(
@@ -21,9 +22,16 @@ class AMQPPublisher(
         amqpChannel.exchangeDeclare(topicName, "topic")
     }
 
-    inline operator fun <reified T: Any> invoke(payload: T, headers: Map<String, String>? = null) {
-        val serializedPayload = Json.encodeToString(payload)
-        publish(serializedPayload, headers)
+    inline operator fun <reified T: Any> invoke(
+        payload: T,
+        headers: Map<String, String>? = null
+    ): Result<Unit, AMQPPublishingError> {
+        return try {
+            Success(Json.encodeToString(payload))
+        } catch (e: Exception) {
+            Failure(AMQPPublishingError("Unable to serialize payload: ${e.message}"))
+        }
+            .andThen { serializedPayload -> publish(serializedPayload, headers) }
     }
 
     @PublishedApi
