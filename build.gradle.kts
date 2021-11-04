@@ -1,4 +1,4 @@
-version = "0.4"
+version = "0.5"
 
 plugins {
     kotlin("plugin.serialization") version "1.5.21"
@@ -9,6 +9,7 @@ kotlin {
     sourceSets {
         val jvmMain by getting {
             dependencies {
+                implementation("io.github.microutils:kotlin-logging-jvm:2.0.11")
                 implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.0")

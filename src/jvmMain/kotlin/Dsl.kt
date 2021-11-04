@@ -41,7 +41,7 @@ class AMQPConsumerPrototype<T: Any>(
     var numberOfWorkers: Int = 2,
 ) {
     fun build(
-        messageHandler: ((AMQPMessage<T>) -> Unit),
+        messageHandler: ((AMQPMessage<T>) -> Result<Unit, AMQPConsumingError>),
         payloadSerializer: KSerializer<T>
     ): Result<AMQPConsumer<T>, AMQPConfigurationError> {
         val topicName = topicName ?: return Failure(AMQPConfigurationError("topicName must be specified"))
@@ -57,7 +57,7 @@ class AMQPConsumerPrototype<T: Any>(
 }
 
 inline fun <reified T: Any> AMQPConnectionConfigPrototype.consumer(
-    noinline messageHandler: ((AMQPMessage<T>) -> Unit),
+    noinline messageHandler: ((AMQPMessage<T>) ->  Result<Unit, AMQPConsumingError>),
     builderBlock: AMQPConsumerPrototype<T>.() -> Unit,
 ) {
     val consumer = AMQPConsumerPrototype<T>().apply(builderBlock).build(messageHandler, serializer())

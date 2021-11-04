@@ -12,6 +12,8 @@ enum class AMQPMessageProperty {
 data class AMQPMessage<T>(
     private val headers: Map<String, String>,
     val payload: T,
+    val acknowledge: () -> Unit,
+    val reject: () -> Unit
 ) {
     operator fun get(key: AMQPMessageProperty): Result<String, AMQPConsumingError> =
         headers[key.name]

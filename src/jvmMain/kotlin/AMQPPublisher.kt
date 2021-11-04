@@ -3,6 +3,7 @@ package no.dossier.libraries.amqpconnector.rabbitmq
 import com.rabbitmq.client.AMQP
 import com.rabbitmq.client.Channel
 import com.rabbitmq.client.Connection
+import com.rabbitmq.client.MessageProperties
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import no.dossier.libraries.functional.Failure
@@ -40,7 +41,10 @@ class AMQPPublisher(
         headers: Map<String, String>? = null
     ): Result<Unit, AMQPPublishingError> = try {
         val amqpProperties = AMQP.BasicProperties().builder()
+            .deliveryMode(2 /*persistent*/)
             .headers(headers).build()
+
+        MessageProperties.PERSISTENT_TEXT_PLAIN
 
         amqpChannel.basicPublish(topicName, routingKey, amqpProperties, serializedPayload.toByteArray())
         Success(Unit)
