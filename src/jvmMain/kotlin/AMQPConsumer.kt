@@ -26,14 +26,27 @@ class AMQPConsumer<T: Any>(
 
         val amqpChannel = connection.createChannel().apply {
             exchangeDeclare(topicName, "topic")
+            exchangeDeclare("$topicName-error", "direct")
+            val queueArgs = mapOf(
+                "x-dead-letter-exchange" to "$topicName-error",
+                "x-dead-letter-routing-key" to queueSpec.name
+            )
             queueDeclare(
                 queueSpec.name,
                 queueSpec.durable,
                 queueSpec.exclusive,
                 queueSpec.autoDelete,
+                queueArgs
+            )
+            queueDeclare(
+                queueSpec.name + "-error",
+                queueSpec.durable,
+                queueSpec.exclusive,
+                queueSpec.autoDelete,
                 null
             )
-            queueBind(queueSpec.name, topicName, bindingKey)
+            queueBind(queueSpec.name, topicName, bindingKey) // main queue
+            queueBind(queueSpec.name + "-error", "$topicName-error", queueSpec.name) //error queue
         }
 
         val workersChannel = KChannel<AMQPMessage<T>>(workersPipeBuffer)
@@ -56,6 +69,7 @@ class AMQPConsumer<T: Any>(
                         }
                         is Failure -> {
                             logger.debug { "Message processing finished with Failure message" }
+                            message.reject()
                         }
                     }
                 }
@@ -70,19 +84,32 @@ class AMQPConsumer<T: Any>(
                 workersChannel.send(
                     AMQPMessage(
                         payload.properties.headers.mapValues { it.value.toString() },
-                        Json.decodeFromString(serializer, String(payload.body))
-                    ) {
-                        withContext(consumerThreadPoolDispatcher) {
-                            logger.debug { "AMQP Consumer - sending ACK" }
+                        Json.decodeFromString(serializer, String(payload.body)),
+                        {
+                            withContext(consumerThreadPoolDispatcher) {
+                                logger.debug { "AMQP Consumer - sending ACK" }
 
-                            try {
-                                @Suppress("BlockingMethodInNonBlockingContext")
-                                amqpChannel.basicAck(payload.envelope.deliveryTag, false)
-                            } catch (e: IOException) {
-                                logger.debug { "AMQP Consumer - failed to send ACK" }
+                                try {
+                                    @Suppress("BlockingMethodInNonBlockingContext")
+                                    amqpChannel.basicAck(payload.envelope.deliveryTag, false)
+                                } catch (e: IOException) {
+                                    logger.debug { "AMQP Consumer - failed to send ACK" }
+                                }
+                            }
+                        },
+                        {
+                            withContext(consumerThreadPoolDispatcher) {
+                                logger.debug { "AMQP Consumer - sending REJECT" }
+
+                                try {
+                                    @Suppress("BlockingMethodInNonBlockingContext")
+                                    amqpChannel.basicReject(payload.envelope.deliveryTag, false)
+                                } catch (e: IOException) {
+                                    logger.debug { "AMQP Consumer - failed to send REJECT" }
+                                }
                             }
                         }
-                    }
+                    )
                 )
             }
 

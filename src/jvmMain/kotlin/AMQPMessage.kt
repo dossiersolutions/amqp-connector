@@ -13,6 +13,7 @@ data class AMQPMessage<T>(
     private val headers: Map<String, String>,
     val payload: T,
     val acknowledge: suspend () -> Unit,
+    val reject: suspend () -> Unit,
 ) {
     operator fun get(key: AMQPMessageProperty): Result<String, AMQPConsumingError> =
         headers[key.name]
