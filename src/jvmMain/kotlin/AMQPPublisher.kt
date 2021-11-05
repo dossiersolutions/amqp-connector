@@ -6,6 +6,7 @@ import com.rabbitmq.client.Connection
 import com.rabbitmq.client.MessageProperties
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import mu.KotlinLogging
 import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Result
 import no.dossier.libraries.functional.Success
@@ -17,6 +18,8 @@ class AMQPPublisher(
     private val routingKey: String,
     connection: Connection
 ) {
+    private val logger = KotlinLogging.logger { }
+
     private val amqpChannel: Channel = connection.createChannel()
 
     init {
@@ -44,7 +47,9 @@ class AMQPPublisher(
             .deliveryMode(2 /*persistent*/)
             .headers(headers).build()
 
-        MessageProperties.PERSISTENT_TEXT_PLAIN
+        logger.debug {
+            "-> \uD83D\uDCE8 AMQP Publisher - sending message to [$topicName] using routing key [$routingKey]"
+        }
 
         amqpChannel.basicPublish(topicName, routingKey, amqpProperties, serializedPayload.toByteArray())
         Success(Unit)

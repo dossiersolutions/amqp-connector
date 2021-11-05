@@ -2,8 +2,11 @@ package no.dossier.libraries.amqpconnector.rabbitmq
 
 import com.rabbitmq.client.Connection
 import com.rabbitmq.client.ConnectionFactory
+import kotlinx.coroutines.asCoroutineDispatcher
 import no.dossier.libraries.functional.*
 import java.net.URI
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 enum class AMQPConnectorRole {
     PUBLISHER,
@@ -12,24 +15,35 @@ enum class AMQPConnectorRole {
 }
 
 data class AMQPConnectorConfig(
+    val connectionName: String?,
     val connectionURI: URI,
     val role: AMQPConnectorRole,
     val consumers: List<AMQPConsumer<*>>
-)
+) {
+    val isPublishing get() = role in (listOf(AMQPConnectorRole.BOTH, AMQPConnectorRole.PUBLISHER))
+    val isConsuming get() = role in (listOf(AMQPConnectorRole.BOTH, AMQPConnectorRole.CONSUMER))
+}
 
 class AMQPConnector private constructor(
     val amqpConnectionConfig: AMQPConnectorConfig,
-    private val connectionFactory: ConnectionFactory,
+    val connectionFactory: ConnectionFactory,
     val publishingConnection: Connection?,
     val consumingConnection: Connection?
 ) {
     companion object {
-        private fun newConnection(connectionFactory: ConnectionFactory): Result<Connection, AMQPConnectionError> =
+        private fun newConnection(
+            connectionFactory: ConnectionFactory,
+            connectionName: String?,
+            executorService: ExecutorService? = null
+        ): Result<Connection, AMQPConnectionError> =
             try {
-                Success(connectionFactory.newConnection())
+                Success(executorService
+                    ?.let { connectionFactory.newConnection(it, connectionName) }
+                    ?: connectionFactory.newConnection(connectionName)
+                )
             }
             catch (e: Exception) {
-                Failure(AMQPConnectionError("Cannot connect to AMQP borker: ${e.message}"))
+                Failure(AMQPConnectionError("Cannot connect to AMQP broker: ${e.message}"))
             }
 
         private fun createFactory(
@@ -42,19 +56,33 @@ class AMQPConnector private constructor(
             Failure(AMQPConnectionFactoryError("Cannot configure connection factory: ${e.message}"))
         }
 
-        fun create(amqpConnectionConfig: AMQPConnectorConfig): Result<AMQPConnector, AMQPError> = attemptBuildResult {
-            val connectionFactory = !createFactory(amqpConnectionConfig)
+        fun create(amqpConnectorConfig: AMQPConnectorConfig): Result<AMQPConnector, AMQPError> = attemptBuildResult {
+            val connectionFactory = !createFactory(amqpConnectorConfig)
             connectionFactory.virtualHost = "/"
 
-            val isPublishing = amqpConnectionConfig.role in (listOf(AMQPConnectorRole.BOTH, AMQPConnectorRole.PUBLISHER))
-            val isConsuming = amqpConnectionConfig.role in (listOf(AMQPConnectorRole.BOTH, AMQPConnectorRole.CONSUMER))
+            val publishingConnection: Connection? = amqpConnectorConfig.isPublishing.takeIf { it }
+                ?.let { !newConnection(connectionFactory, amqpConnectorConfig.connectionName) }
 
-            val publishingConnection: Connection? = if (isPublishing) !newConnection(connectionFactory) else null
-            val consumingConnection: Connection? = if (isConsuming) !newConnection(connectionFactory) else null
+            val consumingConnection: Connection? = amqpConnectorConfig.isConsuming.takeIf { it }
+                ?.let {
+                    val executorService = Executors.newFixedThreadPool(1)
+                    val connection = !newConnection(
+                        connectionFactory,
+                        amqpConnectorConfig.connectionName,
+                        executorService
+                    )
+                    amqpConnectorConfig.consumers.forEach {
+                        it.startConsuming(connection, executorService.asCoroutineDispatcher())
+                    }
+                    connection
+                }
 
-            if (isConsuming) amqpConnectionConfig.consumers.forEach { it.startConsuming(consumingConnection!!) }
-
-            Success(AMQPConnector(amqpConnectionConfig, connectionFactory, publishingConnection, consumingConnection))
+            Success(AMQPConnector(
+                amqpConnectorConfig,
+                connectionFactory,
+                publishingConnection,
+                consumingConnection
+            ))
         }
     }
 

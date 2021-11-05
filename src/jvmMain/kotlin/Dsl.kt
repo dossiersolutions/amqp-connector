@@ -9,6 +9,7 @@ import java.io.IOException
 import java.lang.RuntimeException
 
 class AMQPConnectionConfigPrototype(
+    var clientName: String? = null,
     var connectionString: String = "amqp://guest:guest@localhost:5672/",
     var role: AMQPConnectorRole = AMQPConnectorRole.BOTH,
     var consumerBuilderResults: List<Result<AMQPConsumer<*>, AMQPConfigurationError>> = listOf()
@@ -20,6 +21,7 @@ class AMQPConnectionConfigPrototype(
         val uri = !getValidatedUri(connectionString).mapError { AMQPConfigurationError(it.message) }
 
         Success(AMQPConnectorConfig(
+            clientName,
             uri,
             role,
             consumers
@@ -34,24 +36,52 @@ fun amqpConnector(
     .andThen { configuration -> AMQPConnector.create(configuration) }
     .getOrElse { throw RuntimeException(it.error.toString()) }
 
+class AMQPQueueSpecPrototype(
+    var name: String = "",
+    var durable: Boolean = false,
+    var exclusive: Boolean = true,
+    var autoDelete: Boolean = true
+) {
+    fun build(): Result<AMQPQueueSpec, AMQPConfigurationError> {
+        return Success(AMQPQueueSpec(
+            name,
+            durable,
+            exclusive,
+            autoDelete
+        ))
+    }
+}
 
 class AMQPConsumerPrototype<T: Any>(
     var topicName: String? = null,
     var bindingKey: String = "#",
     var numberOfWorkers: Int = 2,
+    var workersPipeBuffer: Int = 16,
 ) {
+    private var queueSpecBuilder: AMQPQueueSpecPrototype.() -> Unit = { }
+
+    fun queueSpec(builder: AMQPQueueSpecPrototype.() -> Unit) {
+        queueSpecBuilder = builder
+    }
+
     fun build(
         messageHandler: ((AMQPMessage<T>) -> Result<Unit, AMQPConsumingError>),
         payloadSerializer: KSerializer<T>
-    ): Result<AMQPConsumer<T>, AMQPConfigurationError> {
-        val topicName = topicName ?: return Failure(AMQPConfigurationError("topicName must be specified"))
+    ): Result<AMQPConsumer<T>, AMQPConfigurationError> = attemptBuildResult {
+        val (topicName) = topicName
+            ?.let { Success(it)}
+            ?: Failure(AMQPConfigurationError("topicName must be specified"))
 
-        return Success(AMQPConsumer(
+        val (queueSpec) = AMQPQueueSpecPrototype().apply(queueSpecBuilder).build()
+
+        Success(AMQPConsumer(
             topicName,
             bindingKey,
             numberOfWorkers,
             messageHandler,
-            payloadSerializer
+            payloadSerializer,
+            workersPipeBuffer,
+            queueSpec
         ))
     }
 }
