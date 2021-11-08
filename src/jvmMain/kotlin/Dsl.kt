@@ -1,6 +1,7 @@
 package no.dossier.libraries.amqpconnector.rabbitmq
 
 import com.rabbitmq.client.Connection
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
 import no.dossier.libraries.functional.*
@@ -52,27 +53,55 @@ class AMQPQueueSpecPrototype(
     }
 }
 
+class AMQPDeadLetterSpecPrototype(
+    var exchangeEnabled: Boolean = false,
+    var exchangeName: String = "error",
+    var routingKey: DeadLetterRoutingKey = DeadLetterRoutingKey.OriginalQueueName,
+    var implicitQueueEnabled: Boolean = true
+) {
+    fun build(): Result<AMQPDeadLetterSpec, AMQPConfigurationError> {
+        return Success(AMQPDeadLetterSpec(
+            exchangeEnabled,
+            exchangeName,
+            routingKey,
+            implicitQueueEnabled
+        ))
+    }
+}
+
 class AMQPConsumerPrototype<T: Any>(
     var topicName: String? = null,
     var bindingKey: String = "#",
     var numberOfWorkers: Int = 2,
     var workersPipeBuffer: Int = 16,
+    var workersCoroutineScope: CoroutineScope? = null
 ) {
-    private var queueSpecBuilder: AMQPQueueSpecPrototype.() -> Unit = { }
+    private val amqpQueueSpecPrototype = AMQPQueueSpecPrototype()
+    private val amqpDeadLetterSpecPrototype = AMQPDeadLetterSpecPrototype()
 
     fun queueSpec(builder: AMQPQueueSpecPrototype.() -> Unit) {
-        queueSpecBuilder = builder
+        amqpQueueSpecPrototype.apply(builder)
+    }
+
+    fun deadLetterSpec(builder: AMQPDeadLetterSpecPrototype.() -> Unit) {
+        amqpDeadLetterSpecPrototype.apply(builder)
     }
 
     fun build(
         messageHandler: ((AMQPMessage<T>) -> Result<Unit, AMQPConsumingError>),
         payloadSerializer: KSerializer<T>
     ): Result<AMQPConsumer<T>, AMQPConfigurationError> = attemptBuildResult {
+
+        val (workersCoroutineScope) = workersCoroutineScope
+            ?.let { Success(it) }
+            ?: Failure(AMQPConfigurationError("Consumer workersCoroutineScope must be specified"))
+
         val (topicName) = topicName
             ?.let { Success(it)}
-            ?: Failure(AMQPConfigurationError("topicName must be specified"))
+            ?: Failure(AMQPConfigurationError("Consumer topicName must be specified"))
 
-        val (queueSpec) = AMQPQueueSpecPrototype().apply(queueSpecBuilder).build()
+        val (queueSpec) = amqpQueueSpecPrototype.build()
+        val (deadLetterSpec) = amqpDeadLetterSpecPrototype.build()
 
         Success(AMQPConsumer(
             topicName,
@@ -81,7 +110,9 @@ class AMQPConsumerPrototype<T: Any>(
             messageHandler,
             payloadSerializer,
             workersPipeBuffer,
-            queueSpec
+            queueSpec,
+            deadLetterSpec,
+            workersCoroutineScope
         ))
     }
 }

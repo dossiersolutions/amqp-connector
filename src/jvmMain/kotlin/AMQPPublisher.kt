@@ -3,7 +3,6 @@ package no.dossier.libraries.amqpconnector.rabbitmq
 import com.rabbitmq.client.AMQP
 import com.rabbitmq.client.Channel
 import com.rabbitmq.client.Connection
-import com.rabbitmq.client.MessageProperties
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import mu.KotlinLogging

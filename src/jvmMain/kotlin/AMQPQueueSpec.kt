@@ -4,5 +4,5 @@ class AMQPQueueSpec(
     val name: String,
     val durable: Boolean,
     val exclusive: Boolean,
-    val autoDelete: Boolean
+    val autoDelete: Boolean,
 )
