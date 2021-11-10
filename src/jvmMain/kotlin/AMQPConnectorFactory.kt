@@ -8,56 +8,6 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 sealed class AMQPConnectorFactory<T> {
-    object PublishingAMQPConnectorFactory : AMQPConnectorFactory<PublishingAMQPConnectorImpl>() {
-        override fun create(
-            amqpConnectorConfig: AMQPConnectorConfig
-        ): Result<PublishingAMQPConnectorImpl, AMQPError> = attemptBuildResult {
-            Success(PublishingAMQPConnectorImpl(
-                amqpConnectorConfig,
-                !createNewConnection(
-                    !createConnectionFactory(amqpConnectorConfig),
-                    amqpConnectorConfig.connectionName
-                )
-            ))
-        }
-    }
-
-    object ConsumingAMQPConnectorFactory : AMQPConnectorFactory<ConsumingAMQPConnectorImpl>() {
-        override fun create(
-            amqpConnectorConfig: AMQPConnectorConfig
-        ): Result<ConsumingAMQPConnectorImpl, AMQPError> = attemptBuildResult {
-            Success(ConsumingAMQPConnectorImpl(
-                amqpConnectorConfig,
-                !createNewConsumingConnection(
-                    !createConnectionFactory(amqpConnectorConfig),
-                    amqpConnectorConfig.connectionName,
-                    amqpConnectorConfig.consumers
-                )
-            ))
-        }
-    }
-
-    object PublishingConsumingAMQPConnectorFactory : AMQPConnectorFactory<PublishingConsumingAMQPConnectorImpl>() {
-        override fun create(
-            amqpConnectorConfig: AMQPConnectorConfig
-        ): Result<PublishingConsumingAMQPConnectorImpl, AMQPError> = attemptBuildResult {
-            val connectionFactory = !createConnectionFactory(amqpConnectorConfig)
-
-            Success(PublishingConsumingAMQPConnectorImpl(
-                amqpConnectorConfig,
-                !createNewConnection(
-                    connectionFactory,
-                    amqpConnectorConfig.connectionName
-                ),
-                !createNewConsumingConnection(
-                    connectionFactory,
-                    amqpConnectorConfig.connectionName,
-                    amqpConnectorConfig.consumers
-                )
-            ))
-        }
-    }
-
     abstract fun create(amqpConnectorConfig: AMQPConnectorConfig): Result<T, AMQPError>
 
     @PublishedApi
@@ -80,7 +30,7 @@ sealed class AMQPConnectorFactory<T> {
     internal fun createNewConsumingConnection(
         connectionFactory: ConnectionFactory,
         connectionName: String?,
-        consumers: List<AMQPConsumer<*>>
+        consumers: List<AMQPConsumer<out Any, out Any>>
     ): Result<Connection, AMQPConnectionError> {
         val executorService = Executors.newFixedThreadPool(1)
         return createNewConnection(connectionFactory, connectionName, executorService)
@@ -103,5 +53,55 @@ sealed class AMQPConnectorFactory<T> {
         Success(factory)
     } catch (e: Exception) {
         Failure(AMQPConnectionFactoryError("Cannot configure connection factory: ${e.message}"))
+    }
+}
+
+object PublishingAMQPConnectorFactory : AMQPConnectorFactory<PublishingAMQPConnectorImpl>() {
+    override fun create(
+        amqpConnectorConfig: AMQPConnectorConfig
+    ): Result<PublishingAMQPConnectorImpl, AMQPError> = attemptBuildResult {
+        Success(PublishingAMQPConnectorImpl(
+            amqpConnectorConfig,
+            !createNewConnection(
+                !createConnectionFactory(amqpConnectorConfig),
+                amqpConnectorConfig.connectionName
+            )
+        ))
+    }
+}
+
+object ConsumingAMQPConnectorFactory : AMQPConnectorFactory<ConsumingAMQPConnectorImpl>() {
+    override fun create(
+        amqpConnectorConfig: AMQPConnectorConfig
+    ): Result<ConsumingAMQPConnectorImpl, AMQPError> = attemptBuildResult {
+        Success(ConsumingAMQPConnectorImpl(
+            amqpConnectorConfig,
+            !createNewConsumingConnection(
+                !createConnectionFactory(amqpConnectorConfig),
+                amqpConnectorConfig.connectionName,
+                amqpConnectorConfig.consumers
+            )
+        ))
+    }
+}
+
+object PublishingConsumingAMQPConnectorFactory : AMQPConnectorFactory<PublishingConsumingAMQPConnectorImpl>() {
+    override fun create(
+        amqpConnectorConfig: AMQPConnectorConfig
+    ): Result<PublishingConsumingAMQPConnectorImpl, AMQPError> = attemptBuildResult {
+        val connectionFactory = !createConnectionFactory(amqpConnectorConfig)
+
+        Success(PublishingConsumingAMQPConnectorImpl(
+            amqpConnectorConfig,
+            !createNewConnection(
+                connectionFactory,
+                amqpConnectorConfig.connectionName
+            ),
+            !createNewConsumingConnection(
+                connectionFactory,
+                amqpConnectorConfig.connectionName,
+                amqpConnectorConfig.consumers
+            )
+        ))
     }
 }

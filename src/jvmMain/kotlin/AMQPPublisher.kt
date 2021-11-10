@@ -13,7 +13,7 @@ import no.dossier.libraries.functional.andThen
 import java.io.IOException
 
 class AMQPPublisher(
-    private val topicName: String,
+    private val exchangeSpec: AMQPExchangeSpec,
     private val routingKey: String,
     connection: Connection
 ) {
@@ -22,7 +22,8 @@ class AMQPPublisher(
     private val amqpChannel: Channel = connection.createChannel()
 
     init {
-        amqpChannel.exchangeDeclare(topicName, "topic")
+        if (exchangeSpec.type != AMQPExchangeType.DEFAULT)
+            amqpChannel.exchangeDeclare(exchangeSpec.name, exchangeSpec.type.stringRepresentation)
     }
 
     inline operator fun <reified T: Any> invoke(
@@ -46,11 +47,13 @@ class AMQPPublisher(
             .deliveryMode(2 /*persistent*/)
             .headers(headers).build()
 
+        val exchangeName = exchangeSpec.type.stringRepresentation
+
         logger.debug {
-            "-> \uD83D\uDCE8 AMQP Publisher - sending message to [$topicName] using routing key [$routingKey]"
+            "-> \uD83D\uDCE8 AMQP Publisher - sending message to [$exchangeName] using routing key [$routingKey]"
         }
 
-        amqpChannel.basicPublish(topicName, routingKey, amqpProperties, serializedPayload.toByteArray())
+        amqpChannel.basicPublish(exchangeName, routingKey, amqpProperties, serializedPayload.toByteArray())
         Success(Unit)
     }
     catch (e: IOException) {

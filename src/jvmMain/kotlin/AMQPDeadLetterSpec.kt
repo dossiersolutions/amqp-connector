@@ -1,8 +1,8 @@
 package no.dossier.libraries.amqpconnector.rabbitmq
 
-class AMQPDeadLetterSpec(
-    val exchangeEnabled: Boolean,
-    val exchangeName: String,
+data class AMQPDeadLetterSpec(
+    val enabled: Boolean,
+    val exchangeSpec: AMQPExchangeSpec,
     val routingKey: DeadLetterRoutingKey,
     val implicitQueueEnabled: Boolean
 )

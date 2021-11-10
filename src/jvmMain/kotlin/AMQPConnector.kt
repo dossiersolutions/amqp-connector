@@ -6,7 +6,7 @@ import java.net.URI
 data class AMQPConnectorConfig(
     val connectionName: String?,
     val connectionURI: URI,
-    val consumers: List<AMQPConsumer<*>>
+    val consumers: List<AMQPConsumer<out Any, out Any>>
 )
 
 sealed interface PublishingAMQPConnector {
