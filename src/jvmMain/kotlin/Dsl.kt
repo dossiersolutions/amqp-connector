@@ -4,6 +4,7 @@ package no.dossier.libraries.amqpconnector.rabbitmq
 
 import com.rabbitmq.client.Connection
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
 import no.dossier.libraries.functional.*
@@ -87,7 +88,7 @@ class AMQPDeadLetterSpecPrototype(
     var implicitQueueEnabled: Boolean = true
 ) {
     private val amqpExchangeSpecPrototype = AMQPExchangeSpecPrototype().apply {
-        name = "error" //overridden default value
+        name = "error" // overridden default value
     }
 
     fun exchangeSpec(builder: AMQPExchangeSpecPrototype.() -> Unit) {
@@ -190,6 +191,54 @@ class AMQPPublisherPrototype(
     }
 }
 
+class AMQPRpcClientPrototype<U: Any>(
+    var routingKey: String = "",
+    var workersCoroutineScope: CoroutineScope? = null
+) {
+    private val amqpExchangeSpecPrototype = AMQPExchangeSpecPrototype().apply {
+        type = AMQPExchangeType.DEFAULT // overridden default value
+    }
+
+    fun exchange(builder: AMQPExchangeSpecPrototype.() -> Unit) {
+        amqpExchangeSpecPrototype.apply(builder)
+    }
+
+    fun build(
+        consumingConnection: Connection,
+        publishingConnection: Connection,
+        consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher,
+        responsePayloadSerializer: KSerializer<U>
+    ): Result<AMQPRpcClient<U>, AMQPConfigurationError> = attemptBuildResult {
+
+        val (exchangeSpec) = amqpExchangeSpecPrototype.build()
+
+        val (workersCoroutineScope) = workersCoroutineScope
+            ?.let { Success(it) }
+            ?: Failure(AMQPConfigurationError("Consumer workersCoroutineScope must be specified"))
+
+        Success(AMQPRpcClient(
+            responsePayloadSerializer,
+            workersCoroutineScope,
+            exchangeSpec,
+            routingKey,
+            publishingConnection,
+            consumingConnection,
+            consumerThreadPoolDispatcher
+        ))
+    }
+}
+
 fun PublishingAMQPConnector.publisher(builder: AMQPPublisherPrototype.() -> Unit): AMQPPublisher =
     AMQPPublisherPrototype().apply(builder).build(publishingConnection)
+        .getOrElse { throw RuntimeException(it.error.toString()) }
+
+inline fun <reified U: Any> PublishingConsumingAMQPConnectorImpl.rpcClient(
+    builder: AMQPRpcClientPrototype<U>.() -> Unit
+): AMQPRpcClient<U> =
+    AMQPRpcClientPrototype<U>()
+        .apply(builder)
+        .apply {
+
+        }
+        .build(consumingConnection, publishingConnection, consumerThreadPoolDispatcher, serializer())
         .getOrElse { throw RuntimeException(it.error.toString()) }

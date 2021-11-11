@@ -35,8 +35,7 @@ class AMQPConsumer<T: Any, U: Any>(
     }
 
     private val createMainExchangesAndQueue: Channel.() -> String = {
-        if (exchangeSpec.type != AMQPExchangeType.DEFAULT)
-            exchangeDeclare(exchangeSpec.name, exchangeSpec.type.stringRepresentation)
+        logger.debug { "Channel created" }
 
         val queueArgs = deadLetterSpec.enabled.takeIf { it }?.let {
             val args = mapOf("x-dead-letter-exchange" to deadLetterSpec.exchangeSpec.name)
@@ -52,12 +51,17 @@ class AMQPConsumer<T: Any, U: Any>(
             queueArgs
         ).queue
 
-        queueBind(actualQueueName, exchangeSpec.name, bindingKey)
-
-        logger.debug { "Channel created. Exchange [${exchangeSpec.name}] created" }
         logger.debug {
-            "Consumer queue (${getQueuePropertiesString()}) [$actualQueueName] created, " +
-                    "bound to [${exchangeSpec.name}]"
+            "Consumer queue (${getQueuePropertiesString()}) [$actualQueueName] created"
+        }
+
+        if (exchangeSpec.type != AMQPExchangeType.DEFAULT) {
+            exchangeDeclare(exchangeSpec.name, exchangeSpec.type.stringRepresentation)
+            logger.debug { "Exchange [${exchangeSpec.name}] created" }
+            queueBind(actualQueueName, exchangeSpec.name, bindingKey)
+            logger.debug {
+                "Queue [$actualQueueName] created bound to [${exchangeSpec.name}]"
+            }
         }
 
         actualQueueName
@@ -67,10 +71,10 @@ class AMQPConsumer<T: Any, U: Any>(
         if (deadLetterSpec.enabled) {
             val exchangeName = deadLetterSpec.exchangeSpec.name
 
-            if (exchangeSpec.type != AMQPExchangeType.DEFAULT)
+            if (exchangeSpec.type != AMQPExchangeType.DEFAULT) {
                 exchangeDeclare(exchangeName, deadLetterSpec.exchangeSpec.type.stringRepresentation)
-
-            logger.debug { "Dead-letter exchange [$exchangeName] created" }
+                logger.debug { "Dead-letter exchange [$exchangeName] created" }
+            }
 
             if (deadLetterSpec.implicitQueueEnabled) {
                 val errorQueueName = "$actualMainQueueName-error"
@@ -82,18 +86,22 @@ class AMQPConsumer<T: Any, U: Any>(
                     null
                 )
 
-                val routingKey = deadLetterRoutingKey ?: "#"
-                queueBind(errorQueueName, exchangeName, routingKey)
-
                 logger.debug {
-                    "Error queue (${getQueuePropertiesString()}) [$errorQueueName] created, " +
-                            "bound to [$exchangeName]"
+                    "Error queue (${getQueuePropertiesString()}) [$errorQueueName] created"
+                }
+
+                if (exchangeSpec.type != AMQPExchangeType.DEFAULT) {
+                    val routingKey = deadLetterRoutingKey ?: "#"
+                    queueBind(errorQueueName, exchangeName, routingKey)
+                    logger.debug {
+                        "Error queue [$errorQueueName] bound to [$exchangeName]"
+                    }
                 }
             }
         }
     }
 
-    fun startConsuming(connection: Connection, consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher) {
+    fun startConsuming(connection: Connection, consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher): String {
         val amqpChannel = connection.createChannel()
         val actualMainQueueName = createMainExchangesAndQueue(amqpChannel)
         createErrorExchangesAndQueue(amqpChannel, actualMainQueueName)
@@ -105,11 +113,11 @@ class AMQPConsumer<T: Any, U: Any>(
             /* This is executed in the AMQP client consumer thread */
             runBlocking {
                 logger.debug {
-                    "-> \uD83D\uDCE8️ AMQP Consumer - forwarding message to processing workers via coroutine channel"
+                    "→ \uD83D\uDCE8️ AMQP Consumer - forwarding message to processing workers via coroutine channel"
                 }
 
                 workersChannel.send(AMQPMessage(
-                    headers = delivery.properties.headers.mapValues { it.value.toString() },
+                    headers = delivery.properties.headers?.mapValues { it.value.toString() } ?: emptyMap(),
                     payload = Json.decodeFromString(serializer, String(delivery.body)),
                     reply = getReplyCallback(consumerThreadPoolDispatcher, amqpChannel),
                     acknowledge = getAckOrRejectCallback(
@@ -131,6 +139,8 @@ class AMQPConsumer<T: Any, U: Any>(
         }, { _ ->
             workersChannel.cancel()
         })
+
+        return actualMainQueueName
     }
 
     private fun getQueuePropertiesString():String = queueSpec.run {
@@ -198,7 +208,9 @@ class AMQPConsumer<T: Any, U: Any>(
         { serializedPayload, replyTo, correlationId ->
             /* Reply callbacks are dispatched back to the AMQP client consumer thread pool */
             withContext(consumerThreadPoolDispatcher) {
-                logger.debug { "AMQP Consumer - sending reply to $replyTo (correlationId: $correlationId)" }
+                logger.debug {
+                    "↩️ \uD83D\uDCE8️ AMQP Consumer - sending reply to $replyTo (correlationId: $correlationId)"
+                }
 
                 try {
                     val replyProperties = AMQP.BasicProperties().builder()
@@ -233,7 +245,7 @@ class AMQPConsumer<T: Any, U: Any>(
                     amqpChannel.basicReject(deliveryTag, false)
                 }
             } catch (e: IOException) {
-                logger.debug { "AMQP Consumer - failed to send $operationName" }
+                logger.error { "AMQP Consumer - failed to send $operationName" }
             }
         }
     }

@@ -15,11 +15,11 @@ import java.io.IOException
 class AMQPPublisher(
     private val exchangeSpec: AMQPExchangeSpec,
     private val routingKey: String,
-    connection: Connection
+    publishingConnection: Connection
 ) {
     private val logger = KotlinLogging.logger { }
 
-    private val amqpChannel: Channel = connection.createChannel()
+    private val amqpChannel: Channel = publishingConnection.createChannel()
 
     init {
         if (exchangeSpec.type != AMQPExchangeType.DEFAULT)
@@ -28,29 +28,38 @@ class AMQPPublisher(
 
     inline operator fun <reified T: Any> invoke(
         payload: T,
-        headers: Map<String, String>? = null
+        headers: Map<String, String>? = null,
+        replyTo: String? = null,
+        correlationId: String? = null
     ): Result<Unit, AMQPPublishingError> {
         return try {
             Success(Json.encodeToString(payload))
         } catch (e: Exception) {
             Failure(AMQPPublishingError("Unable to serialize payload: ${e.message}"))
         }
-            .andThen { serializedPayload -> publish(serializedPayload, headers) }
+            .andThen { serializedPayload -> publish(serializedPayload, headers, replyTo, correlationId) }
     }
 
     @PublishedApi
     internal fun publish(
         serializedPayload: String,
-        headers: Map<String, String>? = null
+        headers: Map<String, String>? = null,
+        replyTo: String? = null,
+        correlationId: String? = null
     ): Result<Unit, AMQPPublishingError> = try {
-        val amqpProperties = AMQP.BasicProperties().builder()
+        val amqpPropertiesBuilder = AMQP.BasicProperties().builder()
             .deliveryMode(2 /*persistent*/)
-            .headers(headers).build()
+            .headers(headers)
+
+        if (replyTo != null) amqpPropertiesBuilder.replyTo(replyTo)
+        if (correlationId != null) amqpPropertiesBuilder.correlationId(correlationId)
+
+        val amqpProperties = amqpPropertiesBuilder.build()
 
         val exchangeName = exchangeSpec.type.stringRepresentation
 
         logger.debug {
-            "-> \uD83D\uDCE8 AMQP Publisher - sending message to [$exchangeName] using routing key [$routingKey]"
+            "← \uD83D\uDCE8 AMQP Publisher - sending message to [$exchangeName] using routing key [$routingKey]"
         }
 
         amqpChannel.basicPublish(exchangeName, routingKey, amqpProperties, serializedPayload.toByteArray())

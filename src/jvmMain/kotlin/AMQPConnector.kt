@@ -1,6 +1,7 @@
 package no.dossier.libraries.amqpconnector.rabbitmq
 
 import com.rabbitmq.client.Connection
+import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import java.net.URI
 
 data class AMQPConnectorConfig(
@@ -9,30 +10,33 @@ data class AMQPConnectorConfig(
     val consumers: List<AMQPConsumer<out Any, out Any>>
 )
 
-sealed interface PublishingAMQPConnector {
+sealed interface AMQPConnector {
+    val amqpConnectionConfig: AMQPConnectorConfig
+}
+
+sealed interface PublishingAMQPConnector: AMQPConnector {
     val publishingConnection: Connection
 }
 
-sealed interface ConsumingAMQPConnector {
+sealed interface ConsumingAMQPConnector: AMQPConnector {
     val consumingConnection: Connection
-}
-
-sealed class AMQPConnector {
-    abstract val amqpConnectionConfig: AMQPConnectorConfig
+    val consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher
 }
 
 class PublishingAMQPConnectorImpl(
     override val amqpConnectionConfig: AMQPConnectorConfig,
     override val publishingConnection: Connection
-): AMQPConnector(), PublishingAMQPConnector
+): PublishingAMQPConnector
 
 class ConsumingAMQPConnectorImpl(
     override val amqpConnectionConfig: AMQPConnectorConfig,
-    override val consumingConnection: Connection
-): AMQPConnector(), ConsumingAMQPConnector
+    override val consumingConnection: Connection,
+    override val consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher
+): ConsumingAMQPConnector
 
 class PublishingConsumingAMQPConnectorImpl(
     override val amqpConnectionConfig: AMQPConnectorConfig,
     override val publishingConnection: Connection,
-    override val consumingConnection: Connection
-): AMQPConnector(), PublishingAMQPConnector, ConsumingAMQPConnector
+    override val consumingConnection: Connection,
+    override val consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher
+): PublishingAMQPConnector, ConsumingAMQPConnector

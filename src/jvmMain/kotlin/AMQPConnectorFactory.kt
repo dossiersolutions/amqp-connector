@@ -10,8 +10,7 @@ import java.util.concurrent.Executors
 sealed class AMQPConnectorFactory<T> {
     abstract fun create(amqpConnectorConfig: AMQPConnectorConfig): Result<T, AMQPError>
 
-    @PublishedApi
-    internal fun createNewConnection(
+    protected fun createNewConnection(
         connectionFactory: ConnectionFactory,
         connectionName: String?,
         executorService: ExecutorService? = null
@@ -26,13 +25,12 @@ sealed class AMQPConnectorFactory<T> {
             Failure(AMQPConnectionError("Cannot connect to AMQP broker: ${e.message}"))
         }
 
-    @PublishedApi
-    internal fun createNewConsumingConnection(
+    protected fun createNewConsumingConnection(
         connectionFactory: ConnectionFactory,
         connectionName: String?,
-        consumers: List<AMQPConsumer<out Any, out Any>>
+        consumers: List<AMQPConsumer<out Any, out Any>>,
+        executorService: ExecutorService
     ): Result<Connection, AMQPConnectionError> {
-        val executorService = Executors.newFixedThreadPool(1)
         return createNewConnection(connectionFactory, connectionName, executorService)
             .andThen { connection ->
                 consumers.forEach {
@@ -43,8 +41,7 @@ sealed class AMQPConnectorFactory<T> {
             }
     }
 
-    @PublishedApi
-    internal fun createConnectionFactory(
+    protected fun createConnectionFactory(
         amqpConnectionConfig: AMQPConnectorConfig,
     ): Result<ConnectionFactory, AMQPConnectionFactoryError> = try {
         val factory = ConnectionFactory()
@@ -74,13 +71,16 @@ object ConsumingAMQPConnectorFactory : AMQPConnectorFactory<ConsumingAMQPConnect
     override fun create(
         amqpConnectorConfig: AMQPConnectorConfig
     ): Result<ConsumingAMQPConnectorImpl, AMQPError> = attemptBuildResult {
+        val executorService = Executors.newFixedThreadPool(1)
         Success(ConsumingAMQPConnectorImpl(
             amqpConnectorConfig,
             !createNewConsumingConnection(
                 !createConnectionFactory(amqpConnectorConfig),
                 amqpConnectorConfig.connectionName,
-                amqpConnectorConfig.consumers
-            )
+                amqpConnectorConfig.consumers,
+                executorService
+            ),
+            executorService.asCoroutineDispatcher()
         ))
     }
 }
@@ -90,7 +90,7 @@ object PublishingConsumingAMQPConnectorFactory : AMQPConnectorFactory<Publishing
         amqpConnectorConfig: AMQPConnectorConfig
     ): Result<PublishingConsumingAMQPConnectorImpl, AMQPError> = attemptBuildResult {
         val connectionFactory = !createConnectionFactory(amqpConnectorConfig)
-
+        val executorService = Executors.newFixedThreadPool(1)
         Success(PublishingConsumingAMQPConnectorImpl(
             amqpConnectorConfig,
             !createNewConnection(
@@ -100,8 +100,10 @@ object PublishingConsumingAMQPConnectorFactory : AMQPConnectorFactory<Publishing
             !createNewConsumingConnection(
                 connectionFactory,
                 amqpConnectorConfig.connectionName,
-                amqpConnectorConfig.consumers
-            )
+                amqpConnectorConfig.consumers,
+                executorService
+            ),
+            executorService.asCoroutineDispatcher()
         ))
     }
 }
