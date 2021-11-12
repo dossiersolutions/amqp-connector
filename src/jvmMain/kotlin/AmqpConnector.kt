@@ -4,39 +4,39 @@ import com.rabbitmq.client.Connection
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import java.net.URI
 
-data class AMQPConnectorConfig(
+data class AmqpConnectorConfig(
     val connectionName: String?,
     val connectionURI: URI,
-    val consumers: List<AMQPConsumer<out Any, out Any>>
+    val consumers: List<AmqpConsumer<out Any, out Any>>
 )
 
-sealed interface AMQPConnector {
-    val amqpConnectionConfig: AMQPConnectorConfig
+sealed interface AmqpConnector {
+    val amqpConnectionConfig: AmqpConnectorConfig
 }
 
-sealed interface PublishingAMQPConnector: AMQPConnector {
+sealed interface PublishingAmqpConnector: AmqpConnector {
     val publishingConnection: Connection
 }
 
-sealed interface ConsumingAMQPConnector: AMQPConnector {
+sealed interface ConsumingAmqpConnector: AmqpConnector {
     val consumingConnection: Connection
     val consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher
 }
 
-class PublishingAMQPConnectorImpl(
-    override val amqpConnectionConfig: AMQPConnectorConfig,
+class PublishingAmqpConnectorImpl(
+    override val amqpConnectionConfig: AmqpConnectorConfig,
     override val publishingConnection: Connection
-): PublishingAMQPConnector
+): PublishingAmqpConnector
 
-class ConsumingAMQPConnectorImpl(
-    override val amqpConnectionConfig: AMQPConnectorConfig,
+class ConsumingAmqpConnectorImpl(
+    override val amqpConnectionConfig: AmqpConnectorConfig,
     override val consumingConnection: Connection,
     override val consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher
-): ConsumingAMQPConnector
+): ConsumingAmqpConnector
 
-class PublishingConsumingAMQPConnectorImpl(
-    override val amqpConnectionConfig: AMQPConnectorConfig,
+class PublishingConsumingAmqpConnectorImpl(
+    override val amqpConnectionConfig: AmqpConnectorConfig,
     override val publishingConnection: Connection,
     override val consumingConnection: Connection,
     override val consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher
-): PublishingAMQPConnector, ConsumingAMQPConnector
+): PublishingAmqpConnector, ConsumingAmqpConnector

@@ -11,34 +11,34 @@ import no.dossier.libraries.functional.*
 import no.dossier.libraries.stl.getValidatedUri
 import java.lang.RuntimeException
 
-sealed class AMQPConnectorRole<F: AMQPConnectorFactory<out AMQPConnector>> {
-    object Publisher : AMQPConnectorRole<PublishingAMQPConnectorFactory>() {
-        override fun getConnectorFactory() = PublishingAMQPConnectorFactory
+sealed class AmqpConnectorRole<F: AmqpConnectorFactory<out AmqpConnector>> {
+    object Publisher : AmqpConnectorRole<PublishingAmqpConnectorFactory>() {
+        override fun getConnectorFactory() = PublishingAmqpConnectorFactory
     }
 
-    object Consumer : AMQPConnectorRole<ConsumingAMQPConnectorFactory>() {
-        override fun getConnectorFactory() = ConsumingAMQPConnectorFactory
+    object Consumer : AmqpConnectorRole<ConsumingAmqpConnectorFactory>() {
+        override fun getConnectorFactory() = ConsumingAmqpConnectorFactory
     }
 
-    object PublisherAndConsumer : AMQPConnectorRole<PublishingConsumingAMQPConnectorFactory>() {
-        override fun getConnectorFactory() = PublishingConsumingAMQPConnectorFactory
+    object PublisherAndConsumer : AmqpConnectorRole<PublishingConsumingAmqpConnectorFactory>() {
+        override fun getConnectorFactory() = PublishingConsumingAmqpConnectorFactory
     }
 
     abstract fun getConnectorFactory(): F
 }
 
-class AMQPConnectionConfigPrototype(
+class AmqpConnectionConfigPrototype(
     var clientName: String? = null,
     var connectionString: String = "amqp://guest:guest@localhost:5672/",
-    var consumerBuilderResults: List<Result<AMQPConsumer<out Any, out Any>, AMQPConfigurationError>> = listOf()
+    var consumerBuilderResults: List<Result<AmqpConsumer<out Any, out Any>, AmqpConfigurationError>> = listOf()
 ) {
-    fun build(): Result<AMQPConnectorConfig, AMQPConfigurationError> = attemptBuildResult {
+    fun build(): Result<AmqpConnectorConfig, AmqpConfigurationError> = attemptBuildResult {
 
         val consumers = !consumerBuilderResults.sequenceToResult()
 
-        val uri = !getValidatedUri(connectionString).mapError { AMQPConfigurationError(it.message) }
+        val uri = !getValidatedUri(connectionString).mapError { AmqpConfigurationError(it.message) }
 
-        Success(AMQPConnectorConfig(
+        Success(AmqpConnectorConfig(
             clientName,
             uri,
             consumers
@@ -46,34 +46,34 @@ class AMQPConnectionConfigPrototype(
     }
 }
 
-fun <C: AMQPConnector, R: AMQPConnectorRole<F>, F : AMQPConnectorFactory<C>> amqpConnector(
-    connectorRole: R,
-    builderBlock: AMQPConnectionConfigPrototype.() -> Unit
-): C = AMQPConnectionConfigPrototype()
+fun <C: AmqpConnector, R: AmqpConnectorRole<F>, F : AmqpConnectorFactory<C>> connector(
+    role: R,
+    builderBlock: AmqpConnectionConfigPrototype.() -> Unit
+): C = AmqpConnectionConfigPrototype()
     .apply(builderBlock).build()
-    .andThen { configuration -> connectorRole.getConnectorFactory().create(configuration) }
+    .andThen { configuration -> role.getConnectorFactory().create(configuration) }
     .getOrElse { throw RuntimeException(it.error.toString()) }
 
-class AMQPExchangeSpecPrototype(
+class AmqpExchangeSpecPrototype(
     var name: String = "",
-    var type: AMQPExchangeType = AMQPExchangeType.TOPIC
+    var type: AmqpExchangeType = AmqpExchangeType.TOPIC
 ) {
-    fun build(): Result<AMQPExchangeSpec, AMQPConfigurationError> {
-        return Success(AMQPExchangeSpec(
+    fun build(): Result<AmqpExchangeSpec, AmqpConfigurationError> {
+        return Success(AmqpExchangeSpec(
             name,
             type,
         ))
     }
 }
 
-class AMQPQueueSpecPrototype(
+class AmqpQueueSpecPrototype(
     var name: String = "",
     var durable: Boolean = false,
     var exclusive: Boolean = true,
     var autoDelete: Boolean = true
 ) {
-    fun build(): Result<AMQPQueueSpec, AMQPConfigurationError> {
-        return Success(AMQPQueueSpec(
+    fun build(): Result<AmqpQueueSpec, AmqpConfigurationError> {
+        return Success(AmqpQueueSpec(
             name,
             durable,
             exclusive,
@@ -82,23 +82,23 @@ class AMQPQueueSpecPrototype(
     }
 }
 
-class AMQPDeadLetterSpecPrototype(
+class AmqpDeadLetterSpecPrototype(
     var enabled: Boolean = false,
     var routingKey: DeadLetterRoutingKey = DeadLetterRoutingKey.OriginalQueueName,
     var implicitQueueEnabled: Boolean = true
 ) {
-    private val amqpExchangeSpecPrototype = AMQPExchangeSpecPrototype().apply {
+    private val amqpExchangeSpecPrototype = AmqpExchangeSpecPrototype().apply {
         name = "error" // overridden default value
     }
 
-    fun exchangeSpec(builder: AMQPExchangeSpecPrototype.() -> Unit) {
+    fun exchangeSpec(builder: AmqpExchangeSpecPrototype.() -> Unit) {
         amqpExchangeSpecPrototype.apply(builder)
     }
 
-    fun build(): Result<AMQPDeadLetterSpec, AMQPConfigurationError> = attemptBuildResult {
+    fun build(): Result<AmqpDeadLetterSpec, AmqpConfigurationError> = attemptBuildResult {
         val (exchangeSpec) = amqpExchangeSpecPrototype.build()
 
-        Success(AMQPDeadLetterSpec(
+        Success(AmqpDeadLetterSpec(
             enabled,
             exchangeSpec,
             routingKey,
@@ -107,44 +107,44 @@ class AMQPDeadLetterSpecPrototype(
     }
 }
 
-class AMQPConsumerPrototype<T: Any>(
+class AmqpConsumerPrototype<T: Any>(
     var bindingKey: String = "#",
     var numberOfWorkers: Int = 2,
     var workersPipeBuffer: Int = 16,
-    var replyingMode: AMQPReplyingMode = AMQPReplyingMode.Never,
+    var replyingMode: AmqpReplyingMode = AmqpReplyingMode.Never,
     var workersCoroutineScope: CoroutineScope? = null
 ) {
-    private val amqpExchangeSpecPrototype = AMQPExchangeSpecPrototype()
-    private val amqpQueueSpecPrototype = AMQPQueueSpecPrototype()
-    private val amqpDeadLetterSpecPrototype = AMQPDeadLetterSpecPrototype()
+    private val amqpExchangeSpecPrototype = AmqpExchangeSpecPrototype()
+    private val amqpQueueSpecPrototype = AmqpQueueSpecPrototype()
+    private val amqpDeadLetterSpecPrototype = AmqpDeadLetterSpecPrototype()
 
-    fun exchange(builder: AMQPExchangeSpecPrototype.() -> Unit) {
+    fun exchange(builder: AmqpExchangeSpecPrototype.() -> Unit) {
         amqpExchangeSpecPrototype.apply(builder)
     }
 
-    fun queue(builder: AMQPQueueSpecPrototype.() -> Unit) {
+    fun queue(builder: AmqpQueueSpecPrototype.() -> Unit) {
         amqpQueueSpecPrototype.apply(builder)
     }
 
-    fun deadLetterForwarding(builder: AMQPDeadLetterSpecPrototype.() -> Unit) {
+    fun deadLetterForwarding(builder: AmqpDeadLetterSpecPrototype.() -> Unit) {
         amqpDeadLetterSpecPrototype.apply(builder)
     }
 
     fun <U: Any> build(
-        messageHandler: (AMQPMessage<T>) -> Result<U, AMQPConsumingError>,
+        messageHandler: (AmqpMessage<T>) -> Result<U, AmqpConsumingError>,
         payloadSerializer: KSerializer<T>,
         replyPayloadSerializer: KSerializer<U>
-    ): Result<AMQPConsumer<T, U>, AMQPConfigurationError> = attemptBuildResult {
+    ): Result<AmqpConsumer<T, U>, AmqpConfigurationError> = attemptBuildResult {
 
         val (workersCoroutineScope) = workersCoroutineScope
             ?.let { Success(it) }
-            ?: Failure(AMQPConfigurationError("Consumer workersCoroutineScope must be specified"))
+            ?: Failure(AmqpConfigurationError("Consumer workersCoroutineScope must be specified"))
 
         val (exchangeSpec) = amqpExchangeSpecPrototype.build()
         val (queueSpec) = amqpQueueSpecPrototype.build()
         val (deadLetterSpec) = amqpDeadLetterSpecPrototype.build()
 
-        Success(AMQPConsumer(
+        Success(AmqpConsumer(
             exchangeSpec,
             bindingKey,
             numberOfWorkers,
@@ -160,30 +160,30 @@ class AMQPConsumerPrototype<T: Any>(
     }
 }
 
-inline fun <reified T: Any, reified U: Any> AMQPConnectionConfigPrototype.consumer(
-    noinline messageHandler: (AMQPMessage<T>) ->  Result<U, AMQPConsumingError>,
-    builderBlock: AMQPConsumerPrototype<T>.() -> Unit,
+inline fun <reified T: Any, reified U: Any> AmqpConnectionConfigPrototype.consumer(
+    noinline messageHandler: (AmqpMessage<T>) ->  Result<U, AmqpConsumingError>,
+    builderBlock: AmqpConsumerPrototype<T>.() -> Unit,
 ) {
-    val consumer = AMQPConsumerPrototype<T>().apply(builderBlock).build(messageHandler, serializer(), serializer())
+    val consumer = AmqpConsumerPrototype<T>().apply(builderBlock).build(messageHandler, serializer(), serializer())
     consumerBuilderResults += consumer
 }
 
-class AMQPPublisherPrototype(
+class AmqpPublisherPrototype(
     var routingKey: String = "",
 ) {
-    private val amqpExchangeSpecPrototype = AMQPExchangeSpecPrototype()
+    private val amqpExchangeSpecPrototype = AmqpExchangeSpecPrototype()
 
-    fun exchange(builder: AMQPExchangeSpecPrototype.() -> Unit) {
+    fun exchange(builder: AmqpExchangeSpecPrototype.() -> Unit) {
         amqpExchangeSpecPrototype.apply(builder)
     }
 
     fun build(
         connection: Connection
-    ): Result<AMQPPublisher, AMQPConfigurationError> = attemptBuildResult {
+    ): Result<AmqpPublisher, AmqpConfigurationError> = attemptBuildResult {
 
         val (exchangeSpec) = amqpExchangeSpecPrototype.build()
 
-        Success(AMQPPublisher(
+        Success(AmqpPublisher(
             exchangeSpec,
             routingKey,
             connection
@@ -191,15 +191,15 @@ class AMQPPublisherPrototype(
     }
 }
 
-class AMQPRpcClientPrototype<U: Any>(
+class AmqpRpcClientPrototype<U: Any>(
     var routingKey: String = "",
     var workersCoroutineScope: CoroutineScope? = null
 ) {
-    private val amqpExchangeSpecPrototype = AMQPExchangeSpecPrototype().apply {
-        type = AMQPExchangeType.DEFAULT // overridden default value
+    private val amqpExchangeSpecPrototype = AmqpExchangeSpecPrototype().apply {
+        type = AmqpExchangeType.DEFAULT // overridden default value
     }
 
-    fun exchange(builder: AMQPExchangeSpecPrototype.() -> Unit) {
+    fun exchange(builder: AmqpExchangeSpecPrototype.() -> Unit) {
         amqpExchangeSpecPrototype.apply(builder)
     }
 
@@ -208,15 +208,15 @@ class AMQPRpcClientPrototype<U: Any>(
         publishingConnection: Connection,
         consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher,
         responsePayloadSerializer: KSerializer<U>
-    ): Result<AMQPRpcClient<U>, AMQPConfigurationError> = attemptBuildResult {
+    ): Result<AmqpRpcClient<U>, AmqpConfigurationError> = attemptBuildResult {
 
         val (exchangeSpec) = amqpExchangeSpecPrototype.build()
 
         val (workersCoroutineScope) = workersCoroutineScope
             ?.let { Success(it) }
-            ?: Failure(AMQPConfigurationError("Consumer workersCoroutineScope must be specified"))
+            ?: Failure(AmqpConfigurationError("Consumer workersCoroutineScope must be specified"))
 
-        Success(AMQPRpcClient(
+        Success(AmqpRpcClient(
             responsePayloadSerializer,
             workersCoroutineScope,
             exchangeSpec,
@@ -228,14 +228,14 @@ class AMQPRpcClientPrototype<U: Any>(
     }
 }
 
-fun PublishingAMQPConnector.publisher(builder: AMQPPublisherPrototype.() -> Unit): AMQPPublisher =
-    AMQPPublisherPrototype().apply(builder).build(publishingConnection)
+fun PublishingAmqpConnector.publisher(builder: AmqpPublisherPrototype.() -> Unit): AmqpPublisher =
+    AmqpPublisherPrototype().apply(builder).build(publishingConnection)
         .getOrElse { throw RuntimeException(it.error.toString()) }
 
-inline fun <reified U: Any> PublishingConsumingAMQPConnectorImpl.rpcClient(
-    builder: AMQPRpcClientPrototype<U>.() -> Unit
-): AMQPRpcClient<U> =
-    AMQPRpcClientPrototype<U>()
+inline fun <reified U: Any> PublishingConsumingAmqpConnectorImpl.rpcClient(
+    builder: AmqpRpcClientPrototype<U>.() -> Unit
+): AmqpRpcClient<U> =
+    AmqpRpcClientPrototype<U>()
         .apply(builder)
         .apply {
 

@@ -12,8 +12,8 @@ import no.dossier.libraries.functional.Success
 import no.dossier.libraries.functional.andThen
 import java.io.IOException
 
-class AMQPPublisher(
-    private val exchangeSpec: AMQPExchangeSpec,
+class AmqpPublisher(
+    private val exchangeSpec: AmqpExchangeSpec,
     private val routingKey: String,
     publishingConnection: Connection
 ) {
@@ -22,7 +22,7 @@ class AMQPPublisher(
     private val amqpChannel: Channel = publishingConnection.createChannel()
 
     init {
-        if (exchangeSpec.type != AMQPExchangeType.DEFAULT)
+        if (exchangeSpec.type != AmqpExchangeType.DEFAULT)
             amqpChannel.exchangeDeclare(exchangeSpec.name, exchangeSpec.type.stringRepresentation)
     }
 
@@ -31,11 +31,11 @@ class AMQPPublisher(
         headers: Map<String, String>? = null,
         replyTo: String? = null,
         correlationId: String? = null
-    ): Result<Unit, AMQPPublishingError> {
+    ): Result<Unit, AmqpPublishingError> {
         return try {
             Success(Json.encodeToString(payload))
         } catch (e: Exception) {
-            Failure(AMQPPublishingError("Unable to serialize payload: ${e.message}"))
+            Failure(AmqpPublishingError("Unable to serialize payload: ${e.message}"))
         }
             .andThen { serializedPayload -> publish(serializedPayload, headers, replyTo, correlationId) }
     }
@@ -46,7 +46,7 @@ class AMQPPublisher(
         headers: Map<String, String>? = null,
         replyTo: String? = null,
         correlationId: String? = null
-    ): Result<Unit, AMQPPublishingError> = try {
+    ): Result<Unit, AmqpPublishingError> = try {
         val amqpPropertiesBuilder = AMQP.BasicProperties().builder()
             .deliveryMode(2 /*persistent*/)
             .headers(headers)
@@ -66,6 +66,6 @@ class AMQPPublisher(
         Success(Unit)
     }
     catch (e: IOException) {
-        Failure(AMQPPublishingError("Unable to publish message: ${e.message}"))
+        Failure(AmqpPublishingError("Unable to publish message: ${e.message}"))
     }
 }

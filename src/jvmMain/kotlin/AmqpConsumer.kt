@@ -13,17 +13,17 @@ import no.dossier.libraries.functional.Success
 import java.io.IOException
 import kotlinx.coroutines.channels.Channel as KChannel
 
-class AMQPConsumer<T: Any, U: Any>(
-    private val exchangeSpec: AMQPExchangeSpec,
+class AmqpConsumer<T: Any, U: Any>(
+    private val exchangeSpec: AmqpExchangeSpec,
     private val bindingKey: String,
     private val numberOfWorkers: Int,
-    private val messageHandler: (AMQPMessage<T>) -> Result<U, AMQPConsumingError>,
+    private val messageHandler: (AmqpMessage<T>) -> Result<U, AmqpConsumingError>,
     private val serializer: KSerializer<T>,
     private val replyPayloadSerializer: KSerializer<U>,
     private val workersPipeBuffer: Int = 16,
-    private val queueSpec: AMQPQueueSpec,
-    private val deadLetterSpec: AMQPDeadLetterSpec,
-    private val replyingMode: AMQPReplyingMode,
+    private val queueSpec: AmqpQueueSpec,
+    private val deadLetterSpec: AmqpDeadLetterSpec,
+    private val replyingMode: AmqpReplyingMode,
     private val workersCoroutineScope: CoroutineScope
 ) {
     private val logger = KotlinLogging.logger { }
@@ -55,7 +55,7 @@ class AMQPConsumer<T: Any, U: Any>(
             "Consumer queue (${getQueuePropertiesString()}) [$actualQueueName] created"
         }
 
-        if (exchangeSpec.type != AMQPExchangeType.DEFAULT) {
+        if (exchangeSpec.type != AmqpExchangeType.DEFAULT) {
             exchangeDeclare(exchangeSpec.name, exchangeSpec.type.stringRepresentation)
             logger.debug { "Exchange [${exchangeSpec.name}] created" }
             queueBind(actualQueueName, exchangeSpec.name, bindingKey)
@@ -71,7 +71,7 @@ class AMQPConsumer<T: Any, U: Any>(
         if (deadLetterSpec.enabled) {
             val exchangeName = deadLetterSpec.exchangeSpec.name
 
-            if (exchangeSpec.type != AMQPExchangeType.DEFAULT) {
+            if (exchangeSpec.type != AmqpExchangeType.DEFAULT) {
                 exchangeDeclare(exchangeName, deadLetterSpec.exchangeSpec.type.stringRepresentation)
                 logger.debug { "Dead-letter exchange [$exchangeName] created" }
             }
@@ -90,7 +90,7 @@ class AMQPConsumer<T: Any, U: Any>(
                     "Error queue (${getQueuePropertiesString()}) [$errorQueueName] created"
                 }
 
-                if (exchangeSpec.type != AMQPExchangeType.DEFAULT) {
+                if (exchangeSpec.type != AmqpExchangeType.DEFAULT) {
                     val routingKey = deadLetterRoutingKey ?: "#"
                     queueBind(errorQueueName, exchangeName, routingKey)
                     logger.debug {
@@ -106,7 +106,7 @@ class AMQPConsumer<T: Any, U: Any>(
         val actualMainQueueName = createMainExchangesAndQueue(amqpChannel)
         createErrorExchangesAndQueue(amqpChannel, actualMainQueueName)
 
-        val workersChannel = KChannel<AMQPMessage<T>>(workersPipeBuffer)
+        val workersChannel = KChannel<AmqpMessage<T>>(workersPipeBuffer)
         launchProcessingWorkers(workersChannel)
 
         amqpChannel.basicConsume(queueSpec.name, false, { _, delivery ->
@@ -116,7 +116,7 @@ class AMQPConsumer<T: Any, U: Any>(
                     "→ \uD83D\uDCE8️ AMQP Consumer - forwarding message to processing workers via coroutine channel"
                 }
 
-                workersChannel.send(AMQPMessage(
+                workersChannel.send(AmqpMessage(
                     headers = delivery.properties.headers?.mapValues { it.value.toString() } ?: emptyMap(),
                     payload = Json.decodeFromString(serializer, String(delivery.body)),
                     reply = getReplyCallback(consumerThreadPoolDispatcher, amqpChannel),
@@ -151,7 +151,7 @@ class AMQPConsumer<T: Any, U: Any>(
     }
 
     private fun launchProcessingWorkers(
-        workersChannel: KChannel<AMQPMessage<T>>
+        workersChannel: KChannel<AmqpMessage<T>>
     ) = repeat(numberOfWorkers) { workerIndex ->
         /* Processing workers coroutines are executed on a custom specified coroutine scope */
         workersCoroutineScope.launch(Dispatchers.Default) {
@@ -162,7 +162,7 @@ class AMQPConsumer<T: Any, U: Any>(
                 logger.debug { "Processing message" }
 
                 val messageHasReplyPropertiesSet = message.replyTo != null && message.correlationId != null
-                if (replyingMode == AMQPReplyingMode.Always && !messageHasReplyPropertiesSet) {
+                if (replyingMode == AmqpReplyingMode.Always && !messageHasReplyPropertiesSet) {
                     logger.error {
                         "Replying mode is set to Always but received message with missing " +
                                 "replyTo and/or correlationId properties"
@@ -175,8 +175,8 @@ class AMQPConsumer<T: Any, U: Any>(
                     is Success -> {
                         logger.debug { "Message processing finished with Success, dispatching ACK" }
                         when(replyingMode) {
-                            AMQPReplyingMode.Always,
-                            AMQPReplyingMode.IfRequired -> if (messageHasReplyPropertiesSet) {
+                            AmqpReplyingMode.Always,
+                            AmqpReplyingMode.IfRequired -> if (messageHasReplyPropertiesSet) {
                                 try {
                                     val payload = Json.encodeToString(replyPayloadSerializer, result.value)
                                     message.reply(payload, message.replyTo!!, message.correlationId!!)
@@ -184,7 +184,7 @@ class AMQPConsumer<T: Any, U: Any>(
                                     logger.debug { "Unable to send reply message ${e.message}" }
                                 }
                             }
-                            AMQPReplyingMode.Never -> if (result.value !is Unit) {
+                            AmqpReplyingMode.Never -> if (result.value !is Unit) {
                                 logger.warn {
                                     "Replying mode is set to Never but message handler returned non-Unit result"
                                 }

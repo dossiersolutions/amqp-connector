@@ -10,11 +10,11 @@ import no.dossier.libraries.stl.getValidatedUUID
 import java.util.*
 import kotlin.coroutines.resume
 
-class AMQPRpcClient<U: Any>(
+class AmqpRpcClient<U: Any>(
     private val responsePayloadSerializer: KSerializer<U>,
     @PublishedApi
     internal val workersCoroutineScope: CoroutineScope,
-    private val publishingExchangeSpec: AMQPExchangeSpec,
+    private val publishingExchangeSpec: AmqpExchangeSpec,
     private val routingKey: String,
     private val publishingConnection: Connection,
     private val consumingConnection: Connection,
@@ -23,24 +23,24 @@ class AMQPRpcClient<U: Any>(
     @PublishedApi
     internal val logger = KotlinLogging.logger { }
 
-    private val consumer: AMQPConsumer<U, Unit>
+    private val consumer: AmqpConsumer<U, Unit>
 
     @PublishedApi
     internal val consumerQueueName: String
 
     @PublishedApi
-    internal val publisher: AMQPPublisher
+    internal val publisher: AmqpPublisher
 
     @PublishedApi
-    internal val pendingRequestsMap = mutableMapOf<UUID, CancellableContinuation<Result<U, AMQPRpcError>>>()
+    internal val pendingRequestsMap = mutableMapOf<UUID, CancellableContinuation<Result<U, AmqpRpcError>>>()
 
-    private val responseMessageHandler: (message: AMQPMessage<U>) -> Result<Unit, AMQPConsumingError> = { message ->
+    private val responseMessageHandler: (message: AmqpMessage<U>) -> Result<Unit, AmqpConsumingError> = { message ->
         logger.debug { "AMQP RPC Client - Received reply message with correlation ID: [${message.correlationId}]" }
 
         val correlationIdResult = message.correlationId
             ?.let(::getValidatedUUID)
-            ?.mapError { AMQPConsumingError("AMQP RPC Client - Invalid correlation ID") }
-            ?: Failure(AMQPConsumingError("AMQP RPC Client - Missing correlationId"))
+            ?.mapError { AmqpConsumingError("AMQP RPC Client - Invalid correlation ID") }
+            ?: Failure(AmqpConsumingError("AMQP RPC Client - Missing correlationId"))
 
         when(correlationIdResult) {
             is Success -> {
@@ -70,26 +70,26 @@ class AMQPRpcClient<U: Any>(
     }
 
     init {
-        val defaultExchangeSpec = AMQPExchangeSpec(
+        val defaultExchangeSpec = AmqpExchangeSpec(
             name = "", //unused for Default
-            type = AMQPExchangeType.DEFAULT
+            type = AmqpExchangeType.DEFAULT
         )
 
-        val queueSpec = AMQPQueueSpec(
+        val queueSpec = AmqpQueueSpec(
             name = "", //Empty string means that the name will be assigned by the brokerExecutorCoroutineDispatcher
             durable = false,
             exclusive = true,
             autoDelete = true
         )
 
-        val deadLetterSpec = AMQPDeadLetterSpec(
+        val deadLetterSpec = AmqpDeadLetterSpec(
             enabled = false, //Since the dead letter forwarding is disabled, the below arguments are not relevant
             exchangeSpec = defaultExchangeSpec,
             routingKey = DeadLetterRoutingKey.SameAsOriginalMessage,
             implicitQueueEnabled = false
         )
 
-        consumer = AMQPConsumer(
+        consumer = AmqpConsumer(
             defaultExchangeSpec,
             "",
             1,
@@ -99,11 +99,11 @@ class AMQPRpcClient<U: Any>(
             16,
             queueSpec,
             deadLetterSpec,
-            AMQPReplyingMode.Never,
+            AmqpReplyingMode.Never,
             workersCoroutineScope
         )
 
-        publisher = AMQPPublisher(
+        publisher = AmqpPublisher(
             publishingExchangeSpec,
             routingKey,
             publishingConnection
@@ -116,7 +116,7 @@ class AMQPRpcClient<U: Any>(
     suspend inline operator fun <reified T: Any> invoke(
         payload: T,
         headers: Map<String, String>? = null
-    ): Result<U, AMQPRpcError> {
+    ): Result<U, AmqpRpcError> {
         val correlationId = UUID.randomUUID()
         return when (val result = publisher(payload, headers, consumerQueueName, correlationId.toString())) {
             is Success -> {
@@ -128,7 +128,7 @@ class AMQPRpcClient<U: Any>(
                 }
             }
             is Failure -> result
-                .mapError { AMQPRpcError("AMQP RPC Client - Failed to send RPC request", mapOf("cause" to it)) }
+                .mapError { AmqpRpcError("AMQP RPC Client - Failed to send RPC request", mapOf("cause" to it)) }
         }
     }
 

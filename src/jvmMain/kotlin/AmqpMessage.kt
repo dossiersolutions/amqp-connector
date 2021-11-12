@@ -4,12 +4,12 @@ import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Result
 import no.dossier.libraries.functional.Success
 
-enum class AMQPMessageProperty {
+enum class AmqpMessageProperty {
     USER,
     API_KEY,
 }
 
-data class AMQPMessage<T>(
+data class AmqpMessage<T>(
     private val headers: Map<String, String>,
     val payload: T,
     val reply: suspend (serializedPayload: String, replyTo: String, correlationId: String) -> Unit,
@@ -18,8 +18,8 @@ data class AMQPMessage<T>(
     val replyTo: String? = null,
     val correlationId: String? = null
 ) {
-    operator fun get(key: AMQPMessageProperty): Result<String, AMQPConsumingError> =
+    operator fun get(key: AmqpMessageProperty): Result<String, AmqpConsumingError> =
         headers[key.name]
             ?.let { Success(it) }
-            ?: Failure(AMQPConsumingError(("Message doesn't contain property: ${key.name}")))
+            ?: Failure(AmqpConsumingError(("Message doesn't contain property: ${key.name}")))
 }

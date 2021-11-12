@@ -1,6 +1,6 @@
 package no.dossier.libraries.amqpconnector.rabbitmq
 
-enum class AMQPExchangeType(val stringRepresentation: String) {
+enum class AmqpExchangeType(val stringRepresentation: String) {
     DEFAULT(""),
     FANOUT("fanout"),
     DIRECT("direct"),
@@ -8,7 +8,7 @@ enum class AMQPExchangeType(val stringRepresentation: String) {
     HEADERS("headers")
 }
 
-data class AMQPExchangeSpec(
+data class AmqpExchangeSpec(
     val name: String,
-    val type: AMQPExchangeType
+    val type: AmqpExchangeType
 )
