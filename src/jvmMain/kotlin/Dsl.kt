@@ -11,34 +11,64 @@ import no.dossier.libraries.functional.*
 import no.dossier.libraries.stl.getValidatedUri
 import java.lang.RuntimeException
 
-sealed class AmqpConnectorRole<F: AmqpConnectorFactory<out AmqpConnector>> {
-    object Publisher : AmqpConnectorRole<PublishingAmqpConnectorFactory>() {
-        override fun getConnectorFactory() = PublishingAmqpConnectorFactory
+sealed class AmqpConnectorRole<
+        P: AmqpConnectorConfigPrototype<out AmqpConnectorConfig>,
+        F: AmqpConnectorFactory<out AmqpConnector, out AmqpConnectorConfig>> {
+
+    object Publisher
+        : AmqpConnectorRole<GenericAmqpConnectorConfigPrototype, PublishingAmqpConnectorFactory>() {
+
+        override val connectorFactory get() = PublishingAmqpConnectorFactory
+        override val connectorConfigPrototypeCtor get() = ::GenericAmqpConnectorConfigPrototype
     }
 
-    object Consumer : AmqpConnectorRole<ConsumingAmqpConnectorFactory>() {
-        override fun getConnectorFactory() = ConsumingAmqpConnectorFactory
+    object Consumer
+        : AmqpConnectorRole<ConsumingAmqpConnectorConfigPrototype, ConsumingAmqpConnectorFactory>() {
+
+        override val connectorFactory get() = ConsumingAmqpConnectorFactory
+        override val connectorConfigPrototypeCtor get() = ::ConsumingAmqpConnectorConfigPrototype
     }
 
-    object PublisherAndConsumer : AmqpConnectorRole<PublishingConsumingAmqpConnectorFactory>() {
-        override fun getConnectorFactory() = PublishingConsumingAmqpConnectorFactory
+    object PublisherAndConsumer
+        : AmqpConnectorRole<ConsumingAmqpConnectorConfigPrototype, PublishingConsumingAmqpConnectorFactory>() {
+
+        override val connectorFactory get() = PublishingConsumingAmqpConnectorFactory
+        override val connectorConfigPrototypeCtor get() = ::ConsumingAmqpConnectorConfigPrototype
     }
 
-    abstract fun getConnectorFactory(): F
+    abstract val connectorFactory: F
+    abstract val connectorConfigPrototypeCtor: () -> P
 }
 
-class AmqpConnectionConfigPrototype(
-    var clientName: String? = null,
-    var connectionString: String = "amqp://guest:guest@localhost:5672/",
-    var consumerBuilderResults: List<Result<AmqpConsumer<out Any, out Any>, AmqpConfigurationError>> = listOf()
-) {
-    fun build(): Result<AmqpConnectorConfig, AmqpConfigurationError> = attemptBuildResult {
+sealed class AmqpConnectorConfigPrototype<C: AmqpConnectorConfig> {
+    var clientName: String? = null
+    var connectionString: String = "amqp://guest:guest@localhost:5672/"
+
+    abstract fun build(): Result<C, AmqpConfigurationError>
+}
+
+class GenericAmqpConnectorConfigPrototype: AmqpConnectorConfigPrototype<GenericAmqpConnectorConfig>() {
+    override fun build(): Result<GenericAmqpConnectorConfig, AmqpConfigurationError> = attemptBuildResult {
+        val uri = !getValidatedUri(connectionString).mapError { AmqpConfigurationError(it.message) }
+
+        Success(GenericAmqpConnectorConfig(
+            clientName,
+            uri,
+        ))
+    }
+}
+
+class ConsumingAmqpConnectorConfigPrototype: AmqpConnectorConfigPrototype<ConsumingAmqpConnectorConfig>() {
+    val consumerBuilderResults: MutableList<Result<AmqpConsumer<out Any, out Any>, AmqpConfigurationError>> =
+        mutableListOf()
+
+    override fun build(): Result<ConsumingAmqpConnectorConfig, AmqpConfigurationError> = attemptBuildResult {
 
         val consumers = !consumerBuilderResults.sequenceToResult()
 
         val uri = !getValidatedUri(connectionString).mapError { AmqpConfigurationError(it.message) }
 
-        Success(AmqpConnectorConfig(
+        Success(ConsumingAmqpConnectorConfig(
             clientName,
             uri,
             consumers
@@ -46,24 +76,22 @@ class AmqpConnectionConfigPrototype(
     }
 }
 
-fun <C: AmqpConnector, R: AmqpConnectorRole<F>, F : AmqpConnectorFactory<C>> connector(
+fun <C, S, F: AmqpConnectorFactory<C, S>, P: AmqpConnectorConfigPrototype<S>, R: AmqpConnectorRole<P, F>> connector(
     role: R,
-    builderBlock: AmqpConnectionConfigPrototype.() -> Unit
-): C = AmqpConnectionConfigPrototype()
+    builderBlock: P.() -> Unit
+): C = role.connectorConfigPrototypeCtor()
     .apply(builderBlock).build()
-    .andThen { configuration -> role.getConnectorFactory().create(configuration) }
+    .andThen { configuration -> role.connectorFactory.create(configuration) }
     .getOrElse { throw RuntimeException(it.error.toString()) }
 
 class AmqpExchangeSpecPrototype(
     var name: String = "",
     var type: AmqpExchangeType = AmqpExchangeType.TOPIC
 ) {
-    fun build(): Result<AmqpExchangeSpec, AmqpConfigurationError> {
-        return Success(AmqpExchangeSpec(
-            name,
-            type,
-        ))
-    }
+    fun build(): Result<AmqpExchangeSpec, AmqpConfigurationError> = Success(AmqpExchangeSpec(
+        name,
+        type,
+    ))
 }
 
 class AmqpQueueSpecPrototype(
@@ -72,14 +100,12 @@ class AmqpQueueSpecPrototype(
     var exclusive: Boolean = true,
     var autoDelete: Boolean = true
 ) {
-    fun build(): Result<AmqpQueueSpec, AmqpConfigurationError> {
-        return Success(AmqpQueueSpec(
-            name,
-            durable,
-            exclusive,
-            autoDelete
-        ))
-    }
+    fun build(): Result<AmqpQueueSpec, AmqpConfigurationError> = Success(AmqpQueueSpec(
+        name,
+        durable,
+        exclusive,
+        autoDelete
+    ))
 }
 
 class AmqpDeadLetterSpecPrototype(
@@ -160,7 +186,7 @@ class AmqpConsumerPrototype<T: Any>(
     }
 }
 
-inline fun <reified T: Any, reified U: Any> AmqpConnectionConfigPrototype.consumer(
+inline fun <reified T: Any, reified U: Any> ConsumingAmqpConnectorConfigPrototype.consumer(
     noinline messageHandler: (AmqpMessage<T>) ->  Result<U, AmqpConsumingError>,
     builderBlock: AmqpConsumerPrototype<T>.() -> Unit,
 ) {

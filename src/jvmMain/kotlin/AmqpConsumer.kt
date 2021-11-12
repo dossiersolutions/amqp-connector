@@ -162,6 +162,7 @@ class AmqpConsumer<T: Any, U: Any>(
                 logger.debug { "Processing message" }
 
                 val messageHasReplyPropertiesSet = message.replyTo != null && message.correlationId != null
+
                 if (replyingMode == AmqpReplyingMode.Always && !messageHasReplyPropertiesSet) {
                     logger.error {
                         "Replying mode is set to Always but received message with missing " +
@@ -179,6 +180,7 @@ class AmqpConsumer<T: Any, U: Any>(
                             AmqpReplyingMode.IfRequired -> if (messageHasReplyPropertiesSet) {
                                 try {
                                     val payload = Json.encodeToString(replyPayloadSerializer, result.value)
+                                    logger.debug { "Message processing finished with Success, dispatching ACK" }
                                     message.reply(payload, message.replyTo!!, message.correlationId!!)
                                 } catch (e: Exception) {
                                     logger.debug { "Unable to send reply message ${e.message}" }
@@ -193,7 +195,7 @@ class AmqpConsumer<T: Any, U: Any>(
                         message.acknowledge()
                     }
                     is Failure -> {
-                        logger.debug { "Message processing finished with Failure message" }
+                        logger.debug { "Message processing finished with Failure, dispatching REJECT" }
                         message.reject()
                     }
                 }

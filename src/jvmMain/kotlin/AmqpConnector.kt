@@ -2,13 +2,6 @@ package no.dossier.libraries.amqpconnector.rabbitmq
 
 import com.rabbitmq.client.Connection
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
-import java.net.URI
-
-data class AmqpConnectorConfig(
-    val connectionName: String?,
-    val connectionURI: URI,
-    val consumers: List<AmqpConsumer<out Any, out Any>>
-)
 
 sealed interface AmqpConnector {
     val amqpConnectionConfig: AmqpConnectorConfig
