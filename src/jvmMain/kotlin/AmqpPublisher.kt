@@ -7,7 +7,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import mu.KotlinLogging
 import no.dossier.libraries.functional.Failure
-import no.dossier.libraries.functional.Result
+import no.dossier.libraries.functional.Outcome
 import no.dossier.libraries.functional.Success
 import no.dossier.libraries.functional.andThen
 import java.io.IOException
@@ -31,7 +31,7 @@ class AmqpPublisher(
         headers: Map<String, String>? = null,
         replyTo: String? = null,
         correlationId: String? = null
-    ): Result<Unit, AmqpPublishingError> {
+    ): Outcome<AmqpPublishingError, Unit> {
         return try {
             Success(Json.encodeToString(payload))
         } catch (e: Exception) {
@@ -46,7 +46,7 @@ class AmqpPublisher(
         headers: Map<String, String>? = null,
         replyTo: String? = null,
         correlationId: String? = null
-    ): Result<Unit, AmqpPublishingError> = try {
+    ): Outcome<AmqpPublishingError, Unit> = try {
         val amqpPropertiesBuilder = AMQP.BasicProperties().builder()
             .deliveryMode(2 /*persistent*/)
             .headers(headers)

@@ -8,7 +8,7 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import mu.KotlinLogging
 import no.dossier.libraries.functional.Failure
-import no.dossier.libraries.functional.Result
+import no.dossier.libraries.functional.Outcome
 import no.dossier.libraries.functional.Success
 import java.io.IOException
 import kotlinx.coroutines.channels.Channel as KChannel
@@ -17,7 +17,7 @@ class AmqpConsumer<T: Any, U: Any>(
     private val exchangeSpec: AmqpExchangeSpec,
     private val bindingKey: String,
     private val numberOfWorkers: Int,
-    private val messageHandler: (AmqpMessage<T>) -> Result<U, AmqpConsumingError>,
+    private val messageHandler: (AmqpMessage<T>) -> Outcome<AmqpConsumingError, U>,
     private val serializer: KSerializer<T>,
     private val replyPayloadSerializer: KSerializer<U>,
     private val workersPipeBuffer: Int = 16,

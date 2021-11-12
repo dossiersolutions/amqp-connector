@@ -32,9 +32,9 @@ class AmqpRpcClient<U: Any>(
     internal val publisher: AmqpPublisher
 
     @PublishedApi
-    internal val pendingRequestsMap = mutableMapOf<UUID, CancellableContinuation<Result<U, AmqpRpcError>>>()
+    internal val pendingRequestsMap = mutableMapOf<UUID, CancellableContinuation<Outcome<AmqpRpcError, U>>>()
 
-    private val responseMessageHandler: (message: AmqpMessage<U>) -> Result<Unit, AmqpConsumingError> = { message ->
+    private val responseMessageHandler: (message: AmqpMessage<U>) -> Outcome<AmqpConsumingError, Unit> = { message ->
         logger.debug { "AMQP RPC Client - Received reply message with correlation ID: [${message.correlationId}]" }
 
         val correlationIdResult = message.correlationId
@@ -116,7 +116,7 @@ class AmqpRpcClient<U: Any>(
     suspend inline operator fun <reified T: Any> invoke(
         payload: T,
         headers: Map<String, String>? = null
-    ): Result<U, AmqpRpcError> {
+    ): Outcome<AmqpRpcError, U> {
         val correlationId = UUID.randomUUID()
         return when (val result = publisher(payload, headers, consumerQueueName, correlationId.toString())) {
             is Success -> {

@@ -1,7 +1,7 @@
 package no.dossier.libraries.amqpconnector.rabbitmq
 
 import no.dossier.libraries.functional.Failure
-import no.dossier.libraries.functional.Result
+import no.dossier.libraries.functional.Outcome
 import no.dossier.libraries.functional.Success
 
 enum class AmqpMessageProperty {
@@ -18,7 +18,7 @@ data class AmqpMessage<T>(
     val replyTo: String? = null,
     val correlationId: String? = null
 ) {
-    operator fun get(key: AmqpMessageProperty): Result<String, AmqpConsumingError> =
+    operator fun get(key: AmqpMessageProperty): Outcome<AmqpConsumingError, String> =
         headers[key.name]
             ?.let { Success(it) }
             ?: Failure(AmqpConsumingError(("Message doesn't contain property: ${key.name}")))

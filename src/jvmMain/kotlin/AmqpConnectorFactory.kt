@@ -9,13 +9,13 @@ import java.util.concurrent.Executors
 
 sealed class AmqpConnectorFactory<C: AmqpConnector, S: AmqpConnectorConfig> {
 
-    abstract fun create(amqpConnectorConfig: S): Result<C, AmqpError>
+    abstract fun create(amqpConnectorConfig: S): Outcome<AmqpError, C>
 
     protected fun createNewConnection(
         connectionFactory: ConnectionFactory,
         connectionName: String?,
         executorService: ExecutorService? = null
-    ): Result<Connection, AmqpConnectionError> = try {
+    ): Outcome<AmqpConnectionError, Connection> = try {
         Success(executorService
             ?.let { connectionFactory.newConnection(it, connectionName) }
             ?: connectionFactory.newConnection(connectionName)
@@ -30,7 +30,7 @@ sealed class AmqpConnectorFactory<C: AmqpConnector, S: AmqpConnectorConfig> {
         connectionName: String?,
         consumers: List<AmqpConsumer<out Any, out Any>>,
         executorService: ExecutorService
-    ): Result<Connection, AmqpConnectionError> =
+    ): Outcome<AmqpConnectionError, Connection> =
         createNewConnection(connectionFactory, connectionName, executorService)
             .andThen { connection ->
                 consumers.forEach {
@@ -42,7 +42,7 @@ sealed class AmqpConnectorFactory<C: AmqpConnector, S: AmqpConnectorConfig> {
 
     protected fun createConnectionFactory(
         amqpConnectionConfig: AmqpConnectorConfig,
-    ): Result<ConnectionFactory, AmqpConnectionFactoryError> = try {
+    ): Outcome<AmqpConnectionFactoryError, ConnectionFactory> = try {
         Success(ConnectionFactory().apply {
             setUri(amqpConnectionConfig.connectionURI)
             virtualHost = "/"
@@ -57,7 +57,7 @@ object PublishingAmqpConnectorFactory
 
     override fun create(
         amqpConnectorConfig: GenericAmqpConnectorConfig
-    ): Result<PublishingAmqpConnectorImpl, AmqpError> = attemptBuildResult {
+    ): Outcome<AmqpError, PublishingAmqpConnectorImpl> = attemptBuildResult {
 
         Success(PublishingAmqpConnectorImpl(
             amqpConnectorConfig,
@@ -74,7 +74,7 @@ object ConsumingAmqpConnectorFactory
 
     override fun create(
         amqpConnectorConfig: ConsumingAmqpConnectorConfig
-    ): Result<ConsumingAmqpConnectorImpl, AmqpError> = attemptBuildResult {
+    ): Outcome<AmqpError, ConsumingAmqpConnectorImpl> = attemptBuildResult {
         val executorService = Executors.newFixedThreadPool(1)
 
         Success(ConsumingAmqpConnectorImpl(
@@ -95,7 +95,7 @@ object PublishingConsumingAmqpConnectorFactory
 
     override fun create(
         amqpConnectorConfig: ConsumingAmqpConnectorConfig
-    ): Result<PublishingConsumingAmqpConnectorImpl, AmqpError> = attemptBuildResult {
+    ): Outcome<AmqpError, PublishingConsumingAmqpConnectorImpl> = attemptBuildResult {
         val connectionFactory = !createConnectionFactory(amqpConnectorConfig)
         val executorService = Executors.newFixedThreadPool(1)
 
