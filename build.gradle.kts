@@ -1,4 +1,4 @@
-version = "0.10"
+version = "0.13"
 
 plugins {
     kotlin("plugin.serialization") version "1.5.21"
@@ -19,6 +19,10 @@ kotlin {
                 implementation(project(":dossier-stl"))
                 implementation(project(":error-handling"))
             }
+        }
+        val jvmDoc by creating {
+            kotlin.srcDir("src/jvmDoc/kotlin")
+            dependsOn(jvmMain)
         }
     }
 }

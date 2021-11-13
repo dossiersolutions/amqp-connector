@@ -1,6 +1,6 @@
 package no.dossier.libraries.amqpconnector.rabbitmq
 
-class AMQPQueueSpec(
+data class AmqpQueueSpec(
     val name: String,
     val durable: Boolean,
     val exclusive: Boolean,
