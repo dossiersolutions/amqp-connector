@@ -21,7 +21,8 @@ class AmqpConnectionError(
 
 class AmqpPublishingError(
     override val message: String,
-    override val causes: Map<String, AmqpError> = emptyMap()
+    override val causes: Map<String, AmqpError> = emptyMap(),
+    val amqpMessage: AmqpMessage<*>
 ) : AmqpError()
 
 class AmqpConsumingError(

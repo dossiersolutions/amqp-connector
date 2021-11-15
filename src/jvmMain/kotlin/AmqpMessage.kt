@@ -10,11 +10,11 @@ enum class AmqpMessageProperty {
 }
 
 data class AmqpMessage<T>(
-    private val headers: Map<String, String>,
     val payload: T,
-    val reply: suspend (serializedPayload: String, replyTo: String, correlationId: String) -> Unit,
-    val acknowledge: suspend () -> Unit,
-    val reject: suspend () -> Unit,
+    val headers: Map<String, String> = mapOf(),
+    val reply: suspend (serializedPayload: String, replyTo: String, correlationId: String) -> Unit = { _, _, _ ->  },
+    val acknowledge: suspend () -> Unit = { },
+    val reject: suspend () -> Unit = { },
     val replyTo: String? = null,
     val correlationId: String? = null
 ) {

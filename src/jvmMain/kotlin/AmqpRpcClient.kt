@@ -8,6 +8,8 @@ import mu.KotlinLogging
 import no.dossier.libraries.functional.*
 import no.dossier.libraries.stl.getValidatedUUID
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentMap
 import kotlin.coroutines.resume
 
 class AmqpRpcClient<U: Any>(
@@ -32,7 +34,7 @@ class AmqpRpcClient<U: Any>(
     internal val publisher: AmqpPublisher
 
     @PublishedApi
-    internal val pendingRequestsMap = mutableMapOf<UUID, CancellableContinuation<Outcome<AmqpRpcError, U>>>()
+    internal val pendingRequestsMap: ConcurrentMap<UUID, CancellableContinuation<Outcome<AmqpRpcError, U>>> = ConcurrentHashMap()
 
     private val responseMessageHandler: (message: AmqpMessage<U>) -> Outcome<AmqpConsumingError, Unit> = { message ->
         logger.debug { "AMQP RPC Client - Received reply message with correlation ID: [${message.correlationId}]" }
@@ -106,6 +108,7 @@ class AmqpRpcClient<U: Any>(
         publisher = AmqpPublisher(
             publishingExchangeSpec,
             routingKey,
+            false,
             publishingConnection
         )
 
@@ -115,10 +118,21 @@ class AmqpRpcClient<U: Any>(
     //TODO: extract internal body into a separate non-inline function and remove the @PublishedApi annotations
     suspend inline operator fun <reified T: Any> invoke(
         payload: T,
-        headers: Map<String, String>? = null
+        headers: Map<String, String> = mapOf()
     ): Outcome<AmqpRpcError, U> {
         val correlationId = UUID.randomUUID()
-        return when (val result = publisher(payload, headers, consumerQueueName, correlationId.toString())) {
+
+        val message = AmqpMessage(
+            payload,
+            headers,
+            { _, _, _ ->  },
+            { },
+            { },
+            consumerQueueName,
+            correlationId.toString()
+        )
+
+        return when (val result = publisher(message)) {
             is Success -> {
                 withContext(workersCoroutineScope.coroutineContext) {
                     suspendCancellableCoroutine {

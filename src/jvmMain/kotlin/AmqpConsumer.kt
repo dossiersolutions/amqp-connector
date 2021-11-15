@@ -180,7 +180,7 @@ class AmqpConsumer<T: Any, U: Any>(
                             AmqpReplyingMode.IfRequired -> if (messageHasReplyPropertiesSet) {
                                 try {
                                     val payload = Json.encodeToString(replyPayloadSerializer, result.value)
-                                    logger.debug { "Message processing finished with Success, dispatching ACK" }
+                                    logger.debug { "Message processing finished with Success, dispatching REPLY" }
                                     message.reply(payload, message.replyTo!!, message.correlationId!!)
                                 } catch (e: Exception) {
                                     logger.debug { "Unable to send reply message ${e.message}" }

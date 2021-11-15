@@ -11,6 +11,9 @@ import no.dossier.libraries.functional.*
 import no.dossier.libraries.stl.getValidatedUri
 import java.lang.RuntimeException
 
+@DslMarker
+annotation class AmqpConnectorDsl
+
 sealed class AmqpConnectorRole<
         P: AmqpConnectorConfigPrototype<out AmqpConnectorConfig>,
         F: AmqpConnectorFactory<out AmqpConnector, out AmqpConnectorConfig>> {
@@ -40,6 +43,7 @@ sealed class AmqpConnectorRole<
     abstract val connectorConfigPrototypeCtor: () -> P
 }
 
+@AmqpConnectorDsl
 sealed class AmqpConnectorConfigPrototype<C: AmqpConnectorConfig> {
     var clientName: String? = null
     var connectionString: String = "amqp://guest:guest@localhost:5672/"
@@ -47,6 +51,7 @@ sealed class AmqpConnectorConfigPrototype<C: AmqpConnectorConfig> {
     abstract fun build(): Outcome<AmqpConfigurationError, C>
 }
 
+@AmqpConnectorDsl
 class GenericAmqpConnectorConfigPrototype: AmqpConnectorConfigPrototype<GenericAmqpConnectorConfig>() {
     override fun build(): Outcome<AmqpConfigurationError, GenericAmqpConnectorConfig> = attemptBuildResult {
         val uri = !getValidatedUri(connectionString).mapError { AmqpConfigurationError(it.message) }
@@ -58,13 +63,14 @@ class GenericAmqpConnectorConfigPrototype: AmqpConnectorConfigPrototype<GenericA
     }
 }
 
+@AmqpConnectorDsl
 class ConsumingAmqpConnectorConfigPrototype: AmqpConnectorConfigPrototype<ConsumingAmqpConnectorConfig>() {
     val consumerBuilderOutcomes: MutableList<Outcome<AmqpConfigurationError, AmqpConsumer<out Any, out Any>>> =
         mutableListOf()
 
     override fun build(): Outcome<AmqpConfigurationError, ConsumingAmqpConnectorConfig> = attemptBuildResult {
 
-        val consumers = !consumerBuilderOutcomes.sequenceToResult()
+        val consumers = !consumerBuilderOutcomes.sequenceToOutcome()
 
         val uri = !getValidatedUri(connectionString).mapError { AmqpConfigurationError(it.message) }
 
@@ -84,6 +90,7 @@ fun <C, S, F: AmqpConnectorFactory<C, S>, P: AmqpConnectorConfigPrototype<S>, R:
     .andThen { configuration -> role.connectorFactory.create(configuration) }
     .getOrElse { throw RuntimeException(it.error.toString()) }
 
+@AmqpConnectorDsl
 class AmqpExchangeSpecPrototype(
     var name: String = "",
     var type: AmqpExchangeType = AmqpExchangeType.TOPIC
@@ -94,6 +101,7 @@ class AmqpExchangeSpecPrototype(
     ))
 }
 
+@AmqpConnectorDsl
 class AmqpQueueSpecPrototype(
     var name: String = "",
     var durable: Boolean = false,
@@ -108,6 +116,7 @@ class AmqpQueueSpecPrototype(
     ))
 }
 
+@AmqpConnectorDsl
 class AmqpDeadLetterSpecPrototype(
     var enabled: Boolean = false,
     var routingKey: DeadLetterRoutingKey = DeadLetterRoutingKey.OriginalQueueName,
@@ -133,6 +142,7 @@ class AmqpDeadLetterSpecPrototype(
     }
 }
 
+@AmqpConnectorDsl
 class AmqpConsumerPrototype<T: Any>(
     var bindingKey: String = "#",
     var numberOfWorkers: Int = 2,
@@ -194,8 +204,10 @@ inline fun <reified T: Any, reified U: Any> ConsumingAmqpConnectorConfigPrototyp
     consumerBuilderOutcomes += consumer
 }
 
+@AmqpConnectorDsl
 class AmqpPublisherPrototype(
     var routingKey: String = "",
+    var confirmations: Boolean = true,
 ) {
     private val amqpExchangeSpecPrototype = AmqpExchangeSpecPrototype()
 
@@ -212,11 +224,13 @@ class AmqpPublisherPrototype(
         Success(AmqpPublisher(
             exchangeSpec,
             routingKey,
-            connection
+            confirmations,
+            connection,
         ))
     }
 }
 
+@AmqpConnectorDsl
 class AmqpRpcClientPrototype<U: Any>(
     var routingKey: String = "",
     var workersCoroutineScope: CoroutineScope? = null
