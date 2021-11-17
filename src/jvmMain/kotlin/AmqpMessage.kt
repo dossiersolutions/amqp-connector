@@ -21,5 +21,5 @@ data class AmqpMessage<T>(
     operator fun get(key: AmqpMessageProperty): Outcome<AmqpConsumingError, String> =
         headers[key.name]
             ?.let { Success(it) }
-            ?: Failure(AmqpConsumingError(("Message doesn't contain property: ${key.name}")))
+            ?: Failure(AmqpConsumingError("Message doesn't contain property: ${key.name}"))
 }

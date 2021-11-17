@@ -9,7 +9,95 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
 import no.dossier.libraries.functional.*
 import no.dossier.libraries.stl.getValidatedUri
-import java.lang.RuntimeException
+
+/**
+ * Calling the [connector] DSL function is a preferred way of instantiating [AmqpConnector].
+ * The [AmqpConnector] has few different implementations, providing different numbers of underlying AMQP connections
+ * for publishing and consuming messages. A specific implementation is chosen based on the [role] parameter.
+ *
+ * The role parameter also determines which implementation of [AmqpConnectorConfigPrototype] will be used
+ * as a receiver to the [builderBlock]. Each configuration prototype implementation offers different set of
+ * attributes and functions which can be used for configuration of the connector.
+ *
+ * Note that connections are automatically established upon creation of a connector instance. If a connection is lost,
+ * the connector tries to recover it automatically. However, if a connection cannot be established yet at the beginning,
+ * the [connector] will throw a RuntimeException.
+ *
+ * @param C Specific type of [AmqpConnector]
+ * @param S Specific type of [AmqpConnectorConfig]
+ * @param F Specific type of [AmqpConnectorFactory]
+ * @param P Specific type of [AmqpConnectorConfigPrototype]
+ * @param R Specific type of [AmqpConnectorRole]
+ * @param role Implies which [AmqpConnectorFactory] and [AmqpConnectorConfigPrototype] will be used,
+ * and thus which [AmqpConnector] implementation will be constructed
+ * @param builderBlock A contextual lambda applied to [AmqpConnectorConfigPrototype]
+ * in order to configure the connector.
+ * @return An instance of a specific subtype of [AmqpConnector]
+ * @throws RuntimeException if the connector cannot be instantiated
+ *
+ * @see consumer Consumer initialization and configuration
+ * @see publisher Publisher initialization and configuration
+ * @see rpcClient RPC Client initialization and configuration
+ * @see AmqpConnector Connector types, its lifecycle, description of underlying connections
+ * @see AmqpConnectorRole Connector types and use-cases
+ * @see AmqpConnectorConfigPrototype Configuration attributes and functions
+ * @sample no.dossier.libraries.amqpconnector.rabbitmq.samples.basicConsumingConnectorInitialization
+ * @sample no.dossier.libraries.amqpconnector.rabbitmq.samples.basicPublishingConnectorInitialization
+ * @sample no.dossier.libraries.amqpconnector.rabbitmq.samples.basicPublishingAndConsumingConnectorInitialization
+ * @sample no.dossier.libraries.amqpconnector.rabbitmq.samples.basicSpringIntegration
+ */
+fun <C, S, F: AmqpConnectorFactory<C, S>, P: AmqpConnectorConfigPrototype<S>, R: AmqpConnectorRole<P, F>> connector(
+    role: R,
+    builderBlock: P.() -> Unit
+): C = role.connectorConfigPrototypeCtor()
+    .apply(builderBlock).build()
+    .andThen { configuration -> role.connectorFactory.create(configuration) }
+    .getOrElse { throw RuntimeException(it.error.toString()) }
+
+/**
+ * This function defines new [AmqpConsumer] within the scope of [AmqpConnector]. Consumers defined this way are
+ * non-cancellable, which means that their lifecycle is the same as the lifecycle of the whole connector.
+ *
+ * The consumer is configured using a set of attributes and functions on [AmqpConsumerPrototype]
+ * (receiver of the [builderBlock] contextual lambda).
+ * Check  [AmqpConsumerPrototype] for details of each configuration option.
+ *
+ * @param T Type of payload of the messages this consumer is supposed to consume
+ * @param U Type of payload of the reply messages (Usually [Unit] when replying is not configured)
+ * @param messageHandler Typically reference to a function or a lambda
+ * which is supposed to process the incoming messages
+ * @param builderBlock A contextual lambda applied to [AmqpConsumerPrototype]
+ * in order to configure the consumer.
+ *
+ * @see AmqpConsumer
+ * @see AmqpConsumerPrototype
+ * @Sample no.dossier.libraries.amqpconnector.rabbitmq.samples.sampleConsumerWithTemporaryQueue
+ * @Sample no.dossier.libraries.amqpconnector.rabbitmq.samples.sampleConsumerWithPersistentQueue
+ * @Sample no.dossier.libraries.amqpconnector.rabbitmq.samples.consumerWithExhaustiveConfiguration
+ */
+inline fun <reified T: Any, reified U: Any> ConsumingAmqpConnectorConfigPrototype.consumer(
+    noinline messageHandler: (AmqpMessage<T>) ->  Outcome<AmqpConsumingError, U>,
+    builderBlock: AmqpConsumerPrototype<T>.() -> Unit,
+) {
+    val consumer = AmqpConsumerPrototype<T>().apply(builderBlock).build(messageHandler, serializer(), serializer())
+    consumerBuilderOutcomes += consumer
+}
+
+fun PublishingAmqpConnector.publisher(builder: AmqpPublisherPrototype.() -> Unit): AmqpPublisher =
+    AmqpPublisherPrototype().apply(builder).build(publishingConnection)
+        .getOrElse { throw RuntimeException(it.error.toString()) }
+
+
+inline fun <reified U: Any> PublishingConsumingAmqpConnectorImpl.rpcClient(
+    builder: AmqpRpcClientPrototype<U>.() -> Unit
+): AmqpRpcClient<U> =
+    AmqpRpcClientPrototype<U>()
+        .apply(builder)
+        .apply {
+
+        }
+        .build(consumingConnection, publishingConnection, consumerThreadPoolDispatcher, serializer())
+        .getOrElse { throw RuntimeException(it.error.toString()) }
 
 @DslMarker
 annotation class AmqpConnectorDsl
@@ -82,25 +170,6 @@ class ConsumingAmqpConnectorConfigPrototype: AmqpConnectorConfigPrototype<Consum
     }
 }
 
-fun <C, S, F: AmqpConnectorFactory<C, S>, P: AmqpConnectorConfigPrototype<S>, R: AmqpConnectorRole<P, F>> connector(
-    role: R,
-    builderBlock: P.() -> Unit
-): C = role.connectorConfigPrototypeCtor()
-    .apply(builderBlock).build()
-    .andThen { configuration -> role.connectorFactory.create(configuration) }
-    .getOrElse { throw RuntimeException(it.error.toString()) }
-
-@AmqpConnectorDsl
-class AmqpExchangeSpecPrototype(
-    var name: String = "",
-    var type: AmqpExchangeType = AmqpExchangeType.TOPIC
-) {
-    fun build(): Outcome<AmqpConfigurationError, AmqpExchangeSpec> = Success(AmqpExchangeSpec(
-        name,
-        type,
-    ))
-}
-
 @AmqpConnectorDsl
 class AmqpQueueSpecPrototype(
     var name: String = "",
@@ -126,7 +195,7 @@ class AmqpDeadLetterSpecPrototype(
         name = "error" // overridden default value
     }
 
-    fun exchangeSpec(builder: AmqpExchangeSpecPrototype.() -> Unit) {
+    fun exchange(builder: AmqpExchangeSpecPrototype.() -> Unit) {
         amqpExchangeSpecPrototype.apply(builder)
     }
 
@@ -196,12 +265,15 @@ class AmqpConsumerPrototype<T: Any>(
     }
 }
 
-inline fun <reified T: Any, reified U: Any> ConsumingAmqpConnectorConfigPrototype.consumer(
-    noinline messageHandler: (AmqpMessage<T>) ->  Outcome<AmqpConsumingError, U>,
-    builderBlock: AmqpConsumerPrototype<T>.() -> Unit,
+@AmqpConnectorDsl
+class AmqpExchangeSpecPrototype(
+    var name: String = "",
+    var type: AmqpExchangeType = AmqpExchangeType.TOPIC
 ) {
-    val consumer = AmqpConsumerPrototype<T>().apply(builderBlock).build(messageHandler, serializer(), serializer())
-    consumerBuilderOutcomes += consumer
+    fun build(): Outcome<AmqpConfigurationError, AmqpExchangeSpec> = Success(AmqpExchangeSpec(
+        name,
+        type,
+    ))
 }
 
 @AmqpConnectorDsl
@@ -267,18 +339,3 @@ class AmqpRpcClientPrototype<U: Any>(
         ))
     }
 }
-
-fun PublishingAmqpConnector.publisher(builder: AmqpPublisherPrototype.() -> Unit): AmqpPublisher =
-    AmqpPublisherPrototype().apply(builder).build(publishingConnection)
-        .getOrElse { throw RuntimeException(it.error.toString()) }
-
-inline fun <reified U: Any> PublishingConsumingAmqpConnectorImpl.rpcClient(
-    builder: AmqpRpcClientPrototype<U>.() -> Unit
-): AmqpRpcClient<U> =
-    AmqpRpcClientPrototype<U>()
-        .apply(builder)
-        .apply {
-
-        }
-        .build(consumingConnection, publishingConnection, consumerThreadPoolDispatcher, serializer())
-        .getOrElse { throw RuntimeException(it.error.toString()) }

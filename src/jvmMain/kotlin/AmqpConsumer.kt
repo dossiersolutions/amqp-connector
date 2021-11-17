@@ -144,10 +144,11 @@ class AmqpConsumer<T: Any, U: Any>(
     }
 
     private fun getQueuePropertiesString():String = queueSpec.run {
-        val durable = if(durable) "durable " else ""
-        val exclusive = if(exclusive) "exclusive " else ""
-        val autoDelete = if(autoDelete) "autoDelete " else ""
-        "$durable$exclusive$autoDelete".trimEnd()
+        mutableSetOf<String>().apply {
+            if (durable) add("durable")
+            if (exclusive) add("exclusive")
+            if (autoDelete) add("autoDelete")
+        }.joinToString(" ")
     }
 
     private fun launchProcessingWorkers(
