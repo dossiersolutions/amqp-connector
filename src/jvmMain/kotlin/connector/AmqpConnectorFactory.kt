@@ -1,8 +1,12 @@
-package no.dossier.libraries.amqpconnector.rabbitmq
+package no.dossier.libraries.amqpconnector.connector
 
 import com.rabbitmq.client.Connection
 import com.rabbitmq.client.ConnectionFactory
 import kotlinx.coroutines.asCoroutineDispatcher
+import no.dossier.libraries.amqpconnector.consumer.AmqpConsumer
+import no.dossier.libraries.amqpconnector.error.AmqpConnectionError
+import no.dossier.libraries.amqpconnector.error.AmqpConnectionFactoryError
+import no.dossier.libraries.amqpconnector.error.AmqpError
 import no.dossier.libraries.functional.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors

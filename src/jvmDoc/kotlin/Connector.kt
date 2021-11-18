@@ -1,9 +1,18 @@
-package no.dossier.libraries.amqpconnector.rabbitmq.samples
+@file:Suppress("MemberVisibilityCanBePrivate", "unused")
+
+package no.dossier.libraries.amqpconnector.samples
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import no.dossier.libraries.amqpconnector.rabbitmq.*
-import no.dossier.libraries.amqpconnector.rabbitmq.AmqpConnectorRole.*
+import no.dossier.libraries.amqpconnector.connector.*
+import no.dossier.libraries.amqpconnector.AmqpConnectorRole.*
+import no.dossier.libraries.amqpconnector.connector
+import no.dossier.libraries.amqpconnector.consumer
+import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
+import no.dossier.libraries.amqpconnector.error.AmqpRpcError
+import no.dossier.libraries.amqpconnector.primitives.AmqpMessage
+import no.dossier.libraries.amqpconnector.publisher
+import no.dossier.libraries.amqpconnector.rpcClient
 import no.dossier.libraries.functional.Outcome
 import no.dossier.libraries.functional.Success
 

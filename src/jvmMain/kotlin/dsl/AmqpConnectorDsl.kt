@@ -1,12 +1,20 @@
 @file:Suppress("MemberVisibilityCanBePrivate", "unused")
 
-package no.dossier.libraries.amqpconnector.rabbitmq
+package no.dossier.libraries.amqpconnector
 
 import com.rabbitmq.client.Connection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
+import no.dossier.libraries.amqpconnector.connector.*
+import no.dossier.libraries.amqpconnector.consumer.AmqpConsumer
+import no.dossier.libraries.amqpconnector.consumer.AmqpReplyingMode
+import no.dossier.libraries.amqpconnector.error.AmqpConfigurationError
+import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
+import no.dossier.libraries.amqpconnector.primitives.*
+import no.dossier.libraries.amqpconnector.publisher.AmqpPublisher
+import no.dossier.libraries.amqpconnector.rpc.AmqpRpcClient
 import no.dossier.libraries.functional.*
 import no.dossier.libraries.stl.getValidatedUri
 
@@ -41,10 +49,10 @@ import no.dossier.libraries.stl.getValidatedUri
  * @see AmqpConnector Connector types, its lifecycle, description of underlying connections
  * @see AmqpConnectorRole Connector types and use-cases
  * @see AmqpConnectorConfigPrototype Configuration attributes and functions
- * @sample no.dossier.libraries.amqpconnector.rabbitmq.samples.basicConsumingConnectorInitialization
- * @sample no.dossier.libraries.amqpconnector.rabbitmq.samples.basicPublishingConnectorInitialization
- * @sample no.dossier.libraries.amqpconnector.rabbitmq.samples.basicPublishingAndConsumingConnectorInitialization
- * @sample no.dossier.libraries.amqpconnector.rabbitmq.samples.basicSpringIntegration
+ * @sample no.dossier.libraries.amqpconnector.samples.basicConsumingConnectorInitialization
+ * @sample no.dossier.libraries.amqpconnector.samples.basicPublishingConnectorInitialization
+ * @sample no.dossier.libraries.amqpconnector.samples.basicPublishingAndConsumingConnectorInitialization
+ * @sample no.dossier.libraries.amqpconnector.samples.basicSpringIntegration
  */
 fun <C, S, F: AmqpConnectorFactory<C, S>, P: AmqpConnectorConfigPrototype<S>, R: AmqpConnectorRole<P, F>> connector(
     role: R,
@@ -55,12 +63,12 @@ fun <C, S, F: AmqpConnectorFactory<C, S>, P: AmqpConnectorConfigPrototype<S>, R:
     .getOrElse { throw RuntimeException(it.error.toString()) }
 
 /**
- * This function defines new [AmqpConsumer] within the scope of [AmqpConnector]. Consumers defined this way are
+ * Defines new [AmqpConsumer] within the scope of [AmqpConnector]. Consumers defined this way are
  * non-cancellable, which means that their lifecycle is the same as the lifecycle of the whole connector.
  *
  * The consumer is configured using a set of attributes and functions on [AmqpConsumerPrototype]
- * (receiver of the [builderBlock] contextual lambda).
- * Check  [AmqpConsumerPrototype] for details of each configuration option.
+ * (the receiver of the [builderBlock] contextual lambda).
+ * Check [AmqpConsumerPrototype] for details regarding each configuration option.
  *
  * @param T Type of payload of the messages this consumer is supposed to consume
  * @param U Type of payload of the reply messages (Usually [Unit] when replying is not configured)
@@ -71,31 +79,65 @@ fun <C, S, F: AmqpConnectorFactory<C, S>, P: AmqpConnectorConfigPrototype<S>, R:
  *
  * @see AmqpConsumer
  * @see AmqpConsumerPrototype
- * @Sample no.dossier.libraries.amqpconnector.rabbitmq.samples.sampleConsumerWithTemporaryQueue
- * @Sample no.dossier.libraries.amqpconnector.rabbitmq.samples.sampleConsumerWithPersistentQueue
- * @Sample no.dossier.libraries.amqpconnector.rabbitmq.samples.consumerWithExhaustiveConfiguration
+ * @Sample no.dossier.libraries.amqpconnector.samples.sampleConsumerWithTemporaryQueue
+ * @Sample no.dossier.libraries.amqpconnector.samples.sampleConsumerWithPersistentQueue
+ * @Sample no.dossier.libraries.amqpconnector.samples.consumerWithExhaustiveConfiguration
  */
 inline fun <reified T: Any, reified U: Any> ConsumingAmqpConnectorConfigPrototype.consumer(
     noinline messageHandler: (AmqpMessage<T>) ->  Outcome<AmqpConsumingError, U>,
     builderBlock: AmqpConsumerPrototype<T>.() -> Unit,
 ) {
-    val consumer = AmqpConsumerPrototype<T>().apply(builderBlock).build(messageHandler, serializer(), serializer())
+    val consumer = AmqpConsumerPrototype<T>()
+        .apply(builderBlock).build(messageHandler, serializer(), serializer())
+
     consumerBuilderOutcomes += consumer
 }
 
-fun PublishingAmqpConnector.publisher(builder: AmqpPublisherPrototype.() -> Unit): AmqpPublisher =
-    AmqpPublisherPrototype().apply(builder).build(publishingConnection)
+/**
+ * Defines new [AmqpPublisher] within the scope of [AmqpConnector].
+ *
+ * The publisher is configured using a set of attributes and functions on [AmqpPublisherPrototype]
+ * (the receiver of the [builderBlock] contextual lambda).
+ * Check [AmqpPublisherPrototype] for details regarding each configuration option.
+ *
+ * @param builderBlock A contextual lambda applied to [AmqpPublisherPrototype]
+ * in order to configure the consumer.
+ *
+ * @see AmqpPublisher
+ * @see AmqpPublisherPrototype
+ * @sample no.dossier.libraries.amqpconnector.samples.samplePublisherPublishingToSpecificQueueWithoutConfirmations
+ * @sample no.dossier.libraries.amqpconnector.samples.samplePublisherPublishingToTopicExchange
+ * @sample no.dossier.libraries.amqpconnector.samples.samplePublisherWithExhaustiveConfiguration
+ * @sample no.dossier.libraries.amqpconnector.samples.sampleSendMethod
+ * @sample no.dossier.libraries.amqpconnector.samples.sampleSendLotOfMessages
+ */
+fun PublishingAmqpConnector.publisher(
+    builderBlock: AmqpPublisherPrototype.() -> Unit
+): AmqpPublisher =
+    AmqpPublisherPrototype()
+        .apply(builderBlock).build(publishingConnection)
         .getOrElse { throw RuntimeException(it.error.toString()) }
 
-
+/**
+ * Defines new [AmqpRpcClient] within the scope of [AmqpConnector].
+ *
+ * The RPC client is configured using a set of attributes and functions on [AmqpRpcClientPrototype]
+ * (the receiver of the [builderBlock] contextual lambda).
+ * Check [AmqpRpcClientPrototype] for details regarding each configuration option.
+ *
+ * @param U Type of response payload (note that the request payload is bound only on invocation of the RPC client)
+ * @param builderBlock A contextual lambda applied to [AmqpRpcClientPrototype]
+ * in order to configure the consumer.
+ *
+ * @see AmqpRpcClient
+ * @see AmqpRpcClientPrototype
+ * @sample no.dossier.libraries.amqpconnector.samples.sampleRpcClient
+ */
 inline fun <reified U: Any> PublishingConsumingAmqpConnectorImpl.rpcClient(
-    builder: AmqpRpcClientPrototype<U>.() -> Unit
+    builderBlock: AmqpRpcClientPrototype<U>.() -> Unit
 ): AmqpRpcClient<U> =
     AmqpRpcClientPrototype<U>()
-        .apply(builder)
-        .apply {
-
-        }
+        .apply(builderBlock)
         .build(consumingConnection, publishingConnection, consumerThreadPoolDispatcher, serializer())
         .getOrElse { throw RuntimeException(it.error.toString()) }
 
@@ -177,12 +219,14 @@ class AmqpQueueSpecPrototype(
     var exclusive: Boolean = true,
     var autoDelete: Boolean = true
 ) {
-    fun build(): Outcome<AmqpConfigurationError, AmqpQueueSpec> = Success(AmqpQueueSpec(
+    fun build(): Outcome<AmqpConfigurationError, AmqpQueueSpec> = Success(
+        AmqpQueueSpec(
         name,
         durable,
         exclusive,
         autoDelete
-    ))
+    )
+    )
 }
 
 @AmqpConnectorDsl
@@ -202,12 +246,14 @@ class AmqpDeadLetterSpecPrototype(
     fun build(): Outcome<AmqpConfigurationError, AmqpDeadLetterSpec> = attemptBuildResult {
         val (exchangeSpec) = amqpExchangeSpecPrototype.build()
 
-        Success(AmqpDeadLetterSpec(
+        Success(
+            AmqpDeadLetterSpec(
             enabled,
             exchangeSpec,
             routingKey,
             implicitQueueEnabled
-        ))
+        )
+        )
     }
 }
 
@@ -249,7 +295,8 @@ class AmqpConsumerPrototype<T: Any>(
         val (queueSpec) = amqpQueueSpecPrototype.build()
         val (deadLetterSpec) = amqpDeadLetterSpecPrototype.build()
 
-        Success(AmqpConsumer(
+        Success(
+            AmqpConsumer(
             exchangeSpec,
             bindingKey,
             numberOfWorkers,
@@ -261,7 +308,8 @@ class AmqpConsumerPrototype<T: Any>(
             deadLetterSpec,
             replyingMode,
             workersCoroutineScope
-        ))
+        )
+        )
     }
 }
 
@@ -270,10 +318,12 @@ class AmqpExchangeSpecPrototype(
     var name: String = "",
     var type: AmqpExchangeType = AmqpExchangeType.TOPIC
 ) {
-    fun build(): Outcome<AmqpConfigurationError, AmqpExchangeSpec> = Success(AmqpExchangeSpec(
+    fun build(): Outcome<AmqpConfigurationError, AmqpExchangeSpec> = Success(
+        AmqpExchangeSpec(
         name,
         type,
-    ))
+    )
+    )
 }
 
 @AmqpConnectorDsl
@@ -328,7 +378,8 @@ class AmqpRpcClientPrototype<U: Any>(
             ?.let { Success(it) }
             ?: Failure(AmqpConfigurationError("Consumer workersCoroutineScope must be specified"))
 
-        Success(AmqpRpcClient(
+        Success(
+            AmqpRpcClient(
             responsePayloadSerializer,
             workersCoroutineScope,
             exchangeSpec,
@@ -336,6 +387,7 @@ class AmqpRpcClientPrototype<U: Any>(
             publishingConnection,
             consumingConnection,
             consumerThreadPoolDispatcher
-        ))
+        )
+        )
     }
 }

@@ -1,4 +1,4 @@
-package no.dossier.libraries.amqpconnector.rabbitmq
+package no.dossier.libraries.amqpconnector.consumer
 
 import com.rabbitmq.client.AMQP
 import com.rabbitmq.client.Channel
@@ -7,6 +7,8 @@ import kotlinx.coroutines.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import mu.KotlinLogging
+import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
+import no.dossier.libraries.amqpconnector.primitives.*
 import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Outcome
 import no.dossier.libraries.functional.Success

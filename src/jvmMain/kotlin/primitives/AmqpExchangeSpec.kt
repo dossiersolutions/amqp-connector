@@ -1,4 +1,4 @@
-package no.dossier.libraries.amqpconnector.rabbitmq
+package no.dossier.libraries.amqpconnector.primitives
 
 enum class AmqpExchangeType(val stringRepresentation: String) {
     DEFAULT(""),

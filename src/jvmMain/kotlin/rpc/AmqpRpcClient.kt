@@ -1,12 +1,18 @@
-package no.dossier.libraries.amqpconnector.rabbitmq
+package no.dossier.libraries.amqpconnector.rpc
 
 import com.rabbitmq.client.Connection
 import kotlinx.coroutines.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.serializer
 import mu.KotlinLogging
+import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
+import no.dossier.libraries.amqpconnector.error.AmqpRpcError
+import no.dossier.libraries.amqpconnector.consumer.AmqpConsumer
+import no.dossier.libraries.amqpconnector.consumer.AmqpReplyingMode
+import no.dossier.libraries.amqpconnector.primitives.*
 import no.dossier.libraries.functional.*
 import no.dossier.libraries.stl.getValidatedUUID
+import no.dossier.libraries.amqpconnector.publisher.AmqpPublisher
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap

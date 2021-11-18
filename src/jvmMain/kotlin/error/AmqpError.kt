@@ -1,5 +1,6 @@
-package no.dossier.libraries.amqpconnector.rabbitmq
+package no.dossier.libraries.amqpconnector.error
 
+import no.dossier.libraries.amqpconnector.primitives.AmqpMessage
 import no.dossier.libraries.errorhandling.InternalError
 
 sealed class AmqpError: InternalError()

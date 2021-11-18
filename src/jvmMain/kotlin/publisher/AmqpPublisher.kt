@@ -1,4 +1,4 @@
-package no.dossier.libraries.amqpconnector.rabbitmq
+package no.dossier.libraries.amqpconnector.publisher
 
 import com.rabbitmq.client.AMQP
 import com.rabbitmq.client.Channel
@@ -8,6 +8,11 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import mu.KotlinLogging
+import no.dossier.libraries.amqpconnector.error.AmqpConfigurationError
+import no.dossier.libraries.amqpconnector.error.AmqpPublishingError
+import no.dossier.libraries.amqpconnector.primitives.AmqpExchangeSpec
+import no.dossier.libraries.amqpconnector.primitives.AmqpExchangeType
+import no.dossier.libraries.amqpconnector.primitives.AmqpMessage
 import no.dossier.libraries.functional.*
 import no.dossier.libraries.stl.suspendCancellableCoroutineWithTimeout
 import java.util.concurrent.ConcurrentSkipListMap

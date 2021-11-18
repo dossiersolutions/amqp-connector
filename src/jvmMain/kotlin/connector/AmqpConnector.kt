@@ -1,4 +1,4 @@
-package no.dossier.libraries.amqpconnector.rabbitmq
+package no.dossier.libraries.amqpconnector.connector
 
 import com.rabbitmq.client.Connection
 import kotlinx.coroutines.ExecutorCoroutineDispatcher

@@ -1,5 +1,6 @@
-package no.dossier.libraries.amqpconnector.rabbitmq
+package no.dossier.libraries.amqpconnector.connector
 
+import no.dossier.libraries.amqpconnector.consumer.AmqpConsumer
 import java.net.URI
 
 sealed interface AmqpConnectorConfig {

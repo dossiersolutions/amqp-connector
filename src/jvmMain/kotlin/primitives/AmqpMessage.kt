@@ -1,5 +1,6 @@
-package no.dossier.libraries.amqpconnector.rabbitmq
+package no.dossier.libraries.amqpconnector.primitives
 
+import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
 import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Outcome
 import no.dossier.libraries.functional.Success
