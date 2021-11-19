@@ -1,11 +1,12 @@
-@file:Suppress("MemberVisibilityCanBePrivate", "unused")
+@file:Suppress("MemberVisibilityCanBePrivate", "unused", "UNUSED_PARAMETER")
 
 package no.dossier.libraries.amqpconnector.samples
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import no.dossier.libraries.amqpconnector.*
 import no.dossier.libraries.amqpconnector.consumer.AmqpReplyingMode
+import no.dossier.libraries.amqpconnector.dsl.ConsumingAmqpConnectorConfigPrototype
+import no.dossier.libraries.amqpconnector.dsl.consumer
 import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
 import no.dossier.libraries.amqpconnector.primitives.AmqpExchangeType
 import no.dossier.libraries.amqpconnector.primitives.AmqpMessage

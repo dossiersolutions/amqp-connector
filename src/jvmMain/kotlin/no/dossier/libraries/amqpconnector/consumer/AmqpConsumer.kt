@@ -19,7 +19,7 @@ class AmqpConsumer<T: Any, U: Any>(
     private val exchangeSpec: AmqpExchangeSpec,
     private val bindingKey: String,
     private val numberOfWorkers: Int,
-    private val messageHandler: (AmqpMessage<T>) -> Outcome<AmqpConsumingError, U>,
+    private val messageHandler: suspend (AmqpMessage<T>) -> Outcome<AmqpConsumingError, U>,
     private val serializer: KSerializer<T>,
     private val replyPayloadSerializer: KSerializer<U>,
     private val workersPipeBuffer: Int = 16,

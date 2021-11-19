@@ -4,10 +4,10 @@ package no.dossier.libraries.amqpconnector.samples
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import no.dossier.libraries.amqpconnector.AmqpConnectorRole
-import no.dossier.libraries.amqpconnector.connector
+import no.dossier.libraries.amqpconnector.dsl.AmqpConnectorRole.PublisherAndConsumer
+import no.dossier.libraries.amqpconnector.dsl.connector
+import no.dossier.libraries.amqpconnector.dsl.rpcClient
 import no.dossier.libraries.amqpconnector.error.AmqpError
-import no.dossier.libraries.amqpconnector.rpcClient
 import no.dossier.libraries.functional.Outcome
 
 fun sampleRpcClient() {
@@ -18,7 +18,7 @@ fun sampleRpcClient() {
     data class SampleResponse(val value: String)
 
     /* Connector role must be set to PublisherAndConsumer in order to be able to create RPC clients on top of it */
-    val connector = connector(role = AmqpConnectorRole.PublisherAndConsumer) {
+    val connector = connector(role = PublisherAndConsumer) {
         // connector setup here
     }
 
