@@ -1,4 +1,4 @@
-# Module Dossier Libraries - amqp-connector
+# Module amqp-connector
 
 AMQP-Connector is a library for integration with AMQP broker (RabbitMQ).
 It relies on the official [RabbitMQ client for Java](https://www.rabbitmq.com/api-guide.html).
