@@ -34,7 +34,7 @@ It relies on the official [RabbitMQ client for Java](https://www.rabbitmq.com/ap
                clientName = "sample-app"
         
                consumer(::sampleProcessingFunction) {
-                   workersCoroutineScope = applicationCoroutineScope
+                   workersCoroutineScope = CoroutineScope(Dispatchers.Default)
                    exchange { name = "some-ref-data" }
                    bindingKey = "refdata.*.user.#"
                }
