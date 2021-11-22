@@ -27,7 +27,7 @@ It relies on the official [RabbitMQ client for Java](https://www.rabbitmq.com/ap
 
 3. Create instance of the connector using DSL and start publishing and/or consuming messages
 
-
+```
        class ExampleResource {
            val connector = connector(role = PublisherAndConsumer) {
                connectionString = "amqp://guest:guest@localhost:5672/"
@@ -53,6 +53,7 @@ It relies on the official [RabbitMQ client for Java](https://www.rabbitmq.com/ap
            suspend fun sendSamplePublication(request: String): Outcome<AmqpPublishingError, Unit> =
                publisher(AmqpMessage(request)) 
        }
+```
 
    See [connector][no.dossier.libraries.amqpconnector.dsl.connector],
    [consumer][no.dossier.libraries.amqpconnector.dsl.consumer],
