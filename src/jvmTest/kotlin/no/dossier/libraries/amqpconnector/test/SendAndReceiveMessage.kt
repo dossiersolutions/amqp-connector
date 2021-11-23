@@ -28,7 +28,7 @@ class SendAndReceiveMessageTest {
         private val onMessage: (AmqpMessage<String>) -> Outcome<AmqpConsumingError, Unit>
     ) {
         private val connector = connector(role = PublisherAndConsumer) {
-           // connectionString = brokerConnectionString
+            connectionString = brokerConnectionString
 
             consumer(onMessage) {
                 workersCoroutineScope = CoroutineScope(Dispatchers.Default)
