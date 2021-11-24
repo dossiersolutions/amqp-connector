@@ -25,8 +25,8 @@ kotlin {
                 implementation("org.junit.jupiter:junit-jupiter-api:5.8.1")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.8.1")
                 runtimeOnly("org.junit.jupiter:junit-jupiter-engine:5.8.1")
-                implementation("org.testcontainers:rabbitmq:1.15.2")
-                implementation("org.testcontainers:junit-jupiter:1.15.2")
+                implementation("org.testcontainers:rabbitmq:1.16.2")
+                implementation("org.testcontainers:junit-jupiter:1.16.2")
             }
         }
         val jvmDoc by creating {

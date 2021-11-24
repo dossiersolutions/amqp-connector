@@ -67,7 +67,7 @@ object PublishingAmqpConnectorFactory
             amqpConnectorConfig,
             !createNewConnection(
                 !createConnectionFactory(amqpConnectorConfig),
-                amqpConnectorConfig.connectionName
+                amqpConnectorConfig.connectionName + "-publisher"
             )
         ))
     }
@@ -85,7 +85,7 @@ object ConsumingAmqpConnectorFactory
             amqpConnectorConfig,
             !createNewConsumingConnection(
                 !createConnectionFactory(amqpConnectorConfig),
-                amqpConnectorConfig.connectionName,
+                amqpConnectorConfig.connectionName + "-consumer",
                 amqpConnectorConfig.consumers,
                 executorService
             ),
@@ -107,11 +107,11 @@ object PublishingConsumingAmqpConnectorFactory
             amqpConnectorConfig,
             !createNewConnection(
                 connectionFactory,
-                amqpConnectorConfig.connectionName
+                amqpConnectorConfig.connectionName + "-publisher"
             ),
             !createNewConsumingConnection(
                 connectionFactory,
-                amqpConnectorConfig.connectionName,
+                amqpConnectorConfig.connectionName + "-consumer",
                 amqpConnectorConfig.consumers,
                 executorService
             ),
