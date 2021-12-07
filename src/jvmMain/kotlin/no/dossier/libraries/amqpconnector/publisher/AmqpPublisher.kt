@@ -3,7 +3,7 @@ package no.dossier.libraries.amqpconnector.publisher
 import com.rabbitmq.client.AMQP
 import com.rabbitmq.client.Channel
 import com.rabbitmq.client.Connection
-import kotlinx.coroutines.CancellableContinuation
+import kotlinx.coroutines.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
@@ -16,6 +16,7 @@ import no.dossier.libraries.amqpconnector.primitives.AmqpMessage
 import no.dossier.libraries.functional.*
 import no.dossier.libraries.stl.suspendCancellableCoroutineWithTimeout
 import java.util.concurrent.ConcurrentSkipListMap
+import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 
 typealias PublishingContinuation = CancellableContinuation<Outcome<AmqpPublishingError, Unit>>
@@ -31,23 +32,38 @@ class AmqpPublisher(
     private val outstandingConfirms: ConcurrentSkipListMap<Long, Pair<PublishingContinuation, AmqpMessage<*>>> =
         ConcurrentSkipListMap()
 
-    private val amqpChannel: Channel = publishingConnection.createChannel()
+    private val amqpChannel: Channel
+
+    private val threadPoolDispatcher: ExecutorCoroutineDispatcher =
+        Executors.newFixedThreadPool(1).asCoroutineDispatcher()
 
     init {
-        if (exchangeSpec.type != AmqpExchangeType.DEFAULT)
-            amqpChannel.exchangeDeclare(exchangeSpec.name, exchangeSpec.type.stringRepresentation)
+        runBlocking {
+            withContext(threadPoolDispatcher) {
+                logger.debug {
+                    "Creating new AMQP publisher publishing to [${exchangeSpec.name}] " +
+                            "exchange using routing key [$routingKey]"
+                }
 
-        if (enableConfirmations) {
-            runCatching({
-                AmqpConfigurationError("Unable to configure channel to use publisher confirms: ${it.message}")
-            }, {
-                amqpChannel.confirmSelect()
-            })
+                amqpChannel = publishingConnection.createChannel()
 
-            amqpChannel.addConfirmListener(
-                getSubmissionFeedbackHandler(true),
-                getSubmissionFeedbackHandler(false)
-            )
+                if (exchangeSpec.type != AmqpExchangeType.DEFAULT)
+                    amqpChannel.exchangeDeclare(exchangeSpec.name, exchangeSpec.type.stringRepresentation)
+
+                if (enableConfirmations) {
+                    runCatching({
+                        AmqpConfigurationError("Unable to configure channel" +
+                                " to use publisher confirms: ${it.message}")
+                    }, {
+                        amqpChannel.confirmSelect()
+                    })
+
+                    amqpChannel.addConfirmListener(
+                        getSubmissionFeedbackHandler(true),
+                        getSubmissionFeedbackHandler(false)
+                    )
+                }
+            }
         }
     }
 
@@ -59,7 +75,7 @@ class AmqpPublisher(
     internal suspend fun <T> publish(
         message: AmqpMessage<T>,
         payloadSerializer: KSerializer<T>,
-    ): Outcome<AmqpPublishingError, Unit> {
+    ): Outcome<AmqpPublishingError, Unit> = withContext(threadPoolDispatcher) {
         val sequenceNumber = amqpChannel.nextPublishSeqNo
 
         logger.debug {
@@ -69,7 +85,7 @@ class AmqpPublisher(
                     "to [${exchangeSpec.name}] using routing key [$routingKey]"
         }
 
-        return if (enableConfirmations) {
+        if (enableConfirmations) {
             suspendCancellableCoroutineWithTimeout(
                 10_000,
                 {
