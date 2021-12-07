@@ -13,6 +13,7 @@ import no.dossier.libraries.amqpconnector.primitives.*
 import no.dossier.libraries.functional.*
 import no.dossier.libraries.stl.getValidatedUUID
 import no.dossier.libraries.amqpconnector.publisher.AmqpPublisher
+import no.dossier.libraries.stl.suspendCancellableCoroutineWithTimeout
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
@@ -124,7 +125,8 @@ class AmqpRpcClient<U: Any>(
     //TODO: extract internal body into a separate non-inline function and remove the @PublishedApi annotations
     suspend inline operator fun <reified T: Any> invoke(
         payload: T,
-        headers: Map<String, String> = mapOf()
+        headers: Map<String, String> = mapOf(),
+        timeoutMillis: Long = 10_000
     ): Outcome<AmqpRpcError, U> {
         val correlationId = UUID.randomUUID()
 
@@ -138,18 +140,28 @@ class AmqpRpcClient<U: Any>(
             correlationId.toString()
         )
 
-        return when (val result = publisher(message)) {
-            is Success -> {
-                withContext(workersCoroutineScope.coroutineContext) {
-                    suspendCancellableCoroutine {
-                        logger.debug { "AMQP RPC Client - Request sent, correlation ID: [${correlationId}]" }
-                        pendingRequestsMap[correlationId] = it
-                    }
+        return suspendCancellableCoroutineWithTimeout(timeoutMillis, {
+            pendingRequestsMap.remove(correlationId)
+            AmqpRpcError("AMQP RPC Client - Request timed out")
+        }, { continuation ->
+            pendingRequestsMap[correlationId] = continuation
+
+            when(val result = publisher.invokeBlocking(message)) {
+                is Failure -> {
+                    /* If the submission fails we want to resume right away */
+                    pendingRequestsMap.remove(correlationId)
+                    continuation.resume(
+                        Failure(AmqpRpcError(
+                            "AMQP RPC Client - Failed to send RPC request",
+                            mapOf("cause" to result.error)
+                        ))
+                    )
+                }
+                is Success -> {
+                    logger.debug { "AMQP RPC Client - Request sent, correlation ID: [${correlationId}]" }
                 }
             }
-            is Failure -> result
-                .mapError { AmqpRpcError("AMQP RPC Client - Failed to send RPC request", mapOf("cause" to it)) }
-        }
+        })
     }
 
 }

@@ -71,6 +71,31 @@ class AmqpPublisher(
         message: AmqpMessage<T>
     ): Outcome<AmqpPublishingError, Unit> = publish(message, serializer())
 
+    inline fun <reified T: Any> invokeBlocking(
+        message: AmqpMessage<T>
+    ): Outcome<AmqpPublishingError, Unit> = publishBlocking(message, serializer())
+
+    @PublishedApi
+    internal fun <T> publishBlocking(
+        message: AmqpMessage<T>,
+        payloadSerializer: KSerializer<T>,
+    ): Outcome<AmqpPublishingError, Unit> =
+        if (enableConfirmations) {
+            Failure(AmqpPublishingError(
+                "publishing messages in blocking way is not supported when confirmations are enabled",
+                amqpMessage = message
+            ))
+        }
+        else {
+            logger.debug {
+                "← \uD83D\uDCE8 AMQP Publisher - sending message " +
+                        "to [${exchangeSpec.name}] using routing key [$routingKey]"
+            }
+
+            submitMessage(message, payloadSerializer)
+        }
+
+
     @PublishedApi
     internal suspend fun <T> publish(
         message: AmqpMessage<T>,
@@ -105,7 +130,10 @@ class AmqpPublisher(
                     val result = submitMessage(message, payloadSerializer)
 
                     /* If the submission fails we want to resume right away */
-                    if (result is Failure) continuation.resume(result)
+                    if (result is Failure) {
+                        outstandingConfirms.remove(sequenceNumber)
+                        continuation.resume(result)
+                    }
                 }
             )
         } else {
@@ -125,7 +153,6 @@ class AmqpPublisher(
                         amqpMessage = message
                     )
                 }, {
-                    @Suppress("BlockingMethodInNonBlockingContext")
                     amqpChannel.basicPublish(
                         exchangeSpec.name,
                         routingKey,
