@@ -25,7 +25,9 @@ class AmqpPublisher(
     private val exchangeSpec: AmqpExchangeSpec,
     private val routingKey: String,
     private val enableConfirmations: Boolean,
-    publishingConnection: Connection
+    publishingConnection: Connection,
+    private val threadPoolDispatcher: ExecutorCoroutineDispatcher =
+        Executors.newFixedThreadPool(1).asCoroutineDispatcher()
 ) {
     private val logger = KotlinLogging.logger { }
 
@@ -33,9 +35,6 @@ class AmqpPublisher(
         ConcurrentSkipListMap()
 
     private val amqpChannel: Channel
-
-    private val threadPoolDispatcher: ExecutorCoroutineDispatcher =
-        Executors.newFixedThreadPool(1).asCoroutineDispatcher()
 
     init {
         runBlocking {

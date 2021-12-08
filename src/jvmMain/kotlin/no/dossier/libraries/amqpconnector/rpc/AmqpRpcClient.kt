@@ -17,6 +17,7 @@ import no.dossier.libraries.stl.suspendCancellableCoroutineWithTimeout
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
+import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 
 class AmqpRpcClient<U: Any>(
@@ -36,6 +37,10 @@ class AmqpRpcClient<U: Any>(
 
     @PublishedApi
     internal val consumerQueueName: String
+
+    @PublishedApi
+    internal val publisherThreadPoolDispatcher: ExecutorCoroutineDispatcher =
+        Executors.newFixedThreadPool(1).asCoroutineDispatcher()
 
     @PublishedApi
     internal val publisher: AmqpPublisher
@@ -116,7 +121,8 @@ class AmqpRpcClient<U: Any>(
             publishingExchangeSpec,
             routingKey,
             false,
-            publishingConnection
+            publishingConnection,
+            publisherThreadPoolDispatcher
         )
 
         consumerQueueName = consumer.startConsuming(consumingConnection, consumerThreadPoolDispatcher)
@@ -140,28 +146,32 @@ class AmqpRpcClient<U: Any>(
             correlationId.toString()
         )
 
-        return suspendCancellableCoroutineWithTimeout(timeoutMillis, {
-            pendingRequestsMap.remove(correlationId)
-            AmqpRpcError("AMQP RPC Client - Request timed out")
-        }, { continuation ->
-            pendingRequestsMap[correlationId] = continuation
+        return withContext(publisherThreadPoolDispatcher) {
+            suspendCancellableCoroutineWithTimeout(timeoutMillis, {
+                pendingRequestsMap.remove(correlationId)
+                AmqpRpcError("AMQP RPC Client - Request timed out")
+            }, { continuation ->
+                pendingRequestsMap[correlationId] = continuation
 
-            when(val result = publisher.invokeBlocking(message)) {
-                is Failure -> {
-                    /* If the submission fails we want to resume right away */
-                    pendingRequestsMap.remove(correlationId)
-                    continuation.resume(
-                        Failure(AmqpRpcError(
-                            "AMQP RPC Client - Failed to send RPC request",
-                            mapOf("cause" to result.error)
-                        ))
-                    )
+                when (val result = publisher.invokeBlocking(message)) {
+                    is Failure -> {
+                        /* If the submission fails we want to resume right away */
+                        pendingRequestsMap.remove(correlationId)
+                        continuation.resume(
+                            Failure(
+                                AmqpRpcError(
+                                    "AMQP RPC Client - Failed to send RPC request",
+                                    mapOf("cause" to result.error)
+                                )
+                            )
+                        )
+                    }
+                    is Success -> {
+                        logger.debug { "AMQP RPC Client - Request sent, correlation ID: [${correlationId}]" }
+                    }
                 }
-                is Success -> {
-                    logger.debug { "AMQP RPC Client - Request sent, correlation ID: [${correlationId}]" }
-                }
-            }
-        })
+            })
+        }
     }
 
 }
