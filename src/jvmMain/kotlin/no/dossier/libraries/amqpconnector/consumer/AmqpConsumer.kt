@@ -8,10 +8,12 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import mu.KotlinLogging
 import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
+import no.dossier.libraries.amqpconnector.error.AmqpPublishingError
 import no.dossier.libraries.amqpconnector.primitives.*
 import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Outcome
 import no.dossier.libraries.functional.Success
+import no.dossier.libraries.functional.runCatching
 import java.io.IOException
 import kotlinx.coroutines.channels.Channel as KChannel
 
@@ -118,25 +120,29 @@ class AmqpConsumer<T: Any, U: Any>(
                     "→ \uD83D\uDCE8️ AMQP Consumer - forwarding message to processing workers via coroutine channel"
                 }
 
-                workersChannel.send(AmqpMessage(
-                    headers = delivery.properties.headers?.mapValues { it.value.toString() } ?: emptyMap(),
-                    payload = Json.decodeFromString(serializer, String(delivery.body)),
-                    reply = getReplyCallback(consumerThreadPoolDispatcher, amqpChannel),
-                    acknowledge = getAckOrRejectCallback(
-                        consumerThreadPoolDispatcher,
-                        amqpChannel,
-                        delivery.envelope.deliveryTag,
-                        true
-                    ),
-                    reject = getAckOrRejectCallback(
-                        consumerThreadPoolDispatcher,
-                        amqpChannel,
-                        delivery.envelope.deliveryTag,
-                        false
-                    ),
-                    replyTo = delivery.properties.replyTo,
-                    correlationId = delivery.properties.correlationId
-                ))
+                runCatching({
+                    AmqpConsumingError("Unable to consume message: ${it.message}")
+                }, {
+                    workersChannel.send(AmqpMessage(
+                        headers = delivery.properties.headers?.mapValues { it.value.toString() } ?: emptyMap(),
+                        payload = Json.decodeFromString(serializer, String(delivery.body)),
+                        reply = getReplyCallback(consumerThreadPoolDispatcher, amqpChannel),
+                        acknowledge = getAckOrRejectCallback(
+                            consumerThreadPoolDispatcher,
+                            amqpChannel,
+                            delivery.envelope.deliveryTag,
+                            true
+                        ),
+                        reject = getAckOrRejectCallback(
+                            consumerThreadPoolDispatcher,
+                            amqpChannel,
+                            delivery.envelope.deliveryTag,
+                            false
+                        ),
+                        replyTo = delivery.properties.replyTo,
+                        correlationId = delivery.properties.correlationId
+                    ))
+                })
             }
         }, { _ ->
             workersChannel.cancel()
