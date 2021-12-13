@@ -8,7 +8,6 @@ import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import mu.KotlinLogging
 import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
-import no.dossier.libraries.amqpconnector.error.AmqpPublishingError
 import no.dossier.libraries.amqpconnector.primitives.*
 import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Outcome
@@ -120,9 +119,7 @@ class AmqpConsumer<T: Any, U: Any>(
                     "→ \uD83D\uDCE8️ AMQP Consumer - forwarding message to processing workers via coroutine channel"
                 }
 
-                runCatching({
-                    AmqpConsumingError("Unable to consume message: ${it.message}")
-                }, {
+                try {
                     workersChannel.send(AmqpMessage(
                         headers = delivery.properties.headers?.mapValues { it.value.toString() } ?: emptyMap(),
                         payload = Json.decodeFromString(serializer, String(delivery.body)),
@@ -142,7 +139,10 @@ class AmqpConsumer<T: Any, U: Any>(
                         replyTo = delivery.properties.replyTo,
                         correlationId = delivery.properties.correlationId
                     ))
-                })
+                }
+                catch (e: Exception) {
+                    logger.error { "Unable to consume message: ${e.message}" }
+                }
             }
         }, { _ ->
             workersChannel.cancel()
