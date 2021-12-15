@@ -114,7 +114,7 @@ class AmqpConsumer<T: Any, U: Any>(
 
         amqpChannel.basicConsume(queueSpec.name, false, { _, delivery ->
             /* This is executed in the AMQP client consumer thread */
-            runBlocking {
+            CoroutineScope(consumerThreadPoolDispatcher).launch {
                 logger.debug {
                     "→ \uD83D\uDCE8️ AMQP Consumer - forwarding message to processing workers via coroutine channel"
                 }

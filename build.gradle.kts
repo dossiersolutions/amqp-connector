@@ -1,4 +1,4 @@
-version = "0.22"
+version = "0.23"
 
 plugins {
     kotlin("plugin.serialization") version "1.5.21"
