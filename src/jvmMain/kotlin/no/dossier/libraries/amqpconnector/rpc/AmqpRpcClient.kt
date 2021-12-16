@@ -23,7 +23,7 @@ import kotlin.coroutines.resume
 class AmqpRpcClient<U: Any>(
     private val responsePayloadSerializer: KSerializer<U>,
     @PublishedApi
-    internal val workersCoroutineScope: CoroutineScope,
+    internal val messageProcessingCoroutineScope: CoroutineScope,
     private val publishingExchangeSpec: AmqpExchangeSpec,
     private val routingKey: String,
     private val publishingConnection: Connection,
@@ -106,15 +106,13 @@ class AmqpRpcClient<U: Any>(
         consumer = AmqpConsumer(
             defaultExchangeSpec,
             "",
-            1,
             responseMessageHandler,
             responsePayloadSerializer,
             serializer(),
-            16,
             queueSpec,
             deadLetterSpec,
             AmqpReplyingMode.Never,
-            workersCoroutineScope
+            messageProcessingCoroutineScope
         )
 
         publisher = AmqpPublisher(

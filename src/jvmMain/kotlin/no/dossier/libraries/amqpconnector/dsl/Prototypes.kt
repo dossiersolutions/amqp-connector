@@ -120,10 +120,8 @@ class AmqpDeadLetterSpecPrototype(
 @AmqpConnectorDsl
 class AmqpConsumerPrototype<T: Any>(
     var bindingKey: String = "#",
-    var numberOfWorkers: Int = 2,
-    var workersPipeBuffer: Int = 16,
     var replyingMode: AmqpReplyingMode = AmqpReplyingMode.Never,
-    var workersCoroutineScope: CoroutineScope? = null
+    var messageProcessingCoroutineScope: CoroutineScope? = null
 ) {
     private val amqpExchangeSpecPrototype = AmqpExchangeSpecPrototype()
     private val amqpQueueSpecPrototype = AmqpQueueSpecPrototype()
@@ -147,7 +145,7 @@ class AmqpConsumerPrototype<T: Any>(
         replyPayloadSerializer: KSerializer<U>
     ): Outcome<AmqpConfigurationError, AmqpConsumer<T, U>> = attemptBuildResult {
 
-        val (workersCoroutineScope) = workersCoroutineScope
+        val (messageProcessingCoroutineScope) = messageProcessingCoroutineScope
             ?.let { Success(it) }
             ?: Failure(AmqpConfigurationError("Consumer workersCoroutineScope must be specified"))
 
@@ -159,15 +157,13 @@ class AmqpConsumerPrototype<T: Any>(
             AmqpConsumer(
                 exchangeSpec,
                 bindingKey,
-                numberOfWorkers,
                 messageHandler,
                 payloadSerializer,
                 replyPayloadSerializer,
-                workersPipeBuffer,
                 queueSpec,
                 deadLetterSpec,
                 replyingMode,
-                workersCoroutineScope
+                messageProcessingCoroutineScope
             )
         )
     }
@@ -218,7 +214,7 @@ class AmqpPublisherPrototype(
 @AmqpConnectorDsl
 class AmqpRpcClientPrototype<U: Any>(
     var routingKey: String = "",
-    var workersCoroutineScope: CoroutineScope? = null
+    var messageProcessingCoroutineScope: CoroutineScope? = null
 ) {
     private val amqpExchangeSpecPrototype = AmqpExchangeSpecPrototype().apply {
         type = AmqpExchangeType.DEFAULT // overridden default value
@@ -237,14 +233,14 @@ class AmqpRpcClientPrototype<U: Any>(
 
         val (exchangeSpec) = amqpExchangeSpecPrototype.build()
 
-        val (workersCoroutineScope) = workersCoroutineScope
+        val (messageProcessingCoroutineScope) = messageProcessingCoroutineScope
             ?.let { Success(it) }
             ?: Failure(AmqpConfigurationError("Consumer workersCoroutineScope must be specified"))
 
         Success(
             AmqpRpcClient(
                 responsePayloadSerializer,
-                workersCoroutineScope,
+                messageProcessingCoroutineScope,
                 exchangeSpec,
                 routingKey,
                 publishingConnection,

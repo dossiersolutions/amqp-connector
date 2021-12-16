@@ -31,7 +31,7 @@ class SendAndReceiveMessageTest {
             connectionString = brokerConnectionString
 
             consumer(onMessage) {
-                workersCoroutineScope = CoroutineScope(Dispatchers.Default)
+                messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
                 exchange { name = "somedata-exchange" }
                 bindingKey = "somedata.#"
             }
