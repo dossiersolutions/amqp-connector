@@ -12,22 +12,19 @@ import no.dossier.libraries.amqpconnector.primitives.*
 import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Outcome
 import no.dossier.libraries.functional.Success
-import no.dossier.libraries.functional.runCatching
+import no.dossier.libraries.stl.suspendCancellableCoroutineWithTimeout
 import java.io.IOException
-import kotlinx.coroutines.channels.Channel as KChannel
 
-class AmqpConsumer<T: Any, U: Any>(
+class AmqpConsumer<T : Any, U : Any>(
     private val exchangeSpec: AmqpExchangeSpec,
     private val bindingKey: String,
-    private val numberOfWorkers: Int,
     private val messageHandler: suspend (AmqpMessage<T>) -> Outcome<AmqpConsumingError, U>,
     private val serializer: KSerializer<T>,
     private val replyPayloadSerializer: KSerializer<U>,
-    private val workersPipeBuffer: Int = 16,
     private val queueSpec: AmqpQueueSpec,
     private val deadLetterSpec: AmqpDeadLetterSpec,
     private val replyingMode: AmqpReplyingMode,
-    private val workersCoroutineScope: CoroutineScope
+    private val messageProcessingCoroutineScope: CoroutineScope
 ) {
     private val logger = KotlinLogging.logger { }
 
@@ -109,18 +106,16 @@ class AmqpConsumer<T: Any, U: Any>(
         val actualMainQueueName = createMainExchangesAndQueue(amqpChannel)
         createErrorExchangesAndQueue(amqpChannel, actualMainQueueName)
 
-        val workersChannel = KChannel<AmqpMessage<T>>(workersPipeBuffer)
-        launchProcessingWorkers(workersChannel)
-
         amqpChannel.basicConsume(queueSpec.name, false, { _, delivery ->
             /* This is executed in the AMQP client consumer thread */
-            CoroutineScope(consumerThreadPoolDispatcher).launch {
-                logger.debug {
-                    "→ \uD83D\uDCE8️ AMQP Consumer - forwarding message to processing workers via coroutine channel"
-                }
+            logger.debug {
+                "→ \uD83D\uDCE8️ AMQP Consumer - forwarding message to processing workers via coroutine channel"
+            }
 
-                try {
-                    workersChannel.send(AmqpMessage(
+            try {
+                /* But the processing of the message should be dispatched to the workers thread pool */
+                messageProcessingCoroutineScope.launch {
+                    processMessage(AmqpMessage(
                         headers = delivery.properties.headers?.mapValues { it.value.toString() } ?: emptyMap(),
                         payload = Json.decodeFromString(serializer, String(delivery.body)),
                         reply = getReplyCallback(consumerThreadPoolDispatcher, amqpChannel),
@@ -140,76 +135,65 @@ class AmqpConsumer<T: Any, U: Any>(
                         correlationId = delivery.properties.correlationId
                     ))
                 }
-                catch (e: Exception) {
-                    logger.error { "Unable to consume message: ${e.message}" }
-                }
+            } catch (e: Exception) {
+                logger.error { "Unable to consume message: ${e.message}" }
             }
         }, { _ ->
-            workersChannel.cancel()
+            //TODO, cancelling is currently not supported
         })
 
         return actualMainQueueName
     }
 
-    private fun getQueuePropertiesString():String = queueSpec.run {
+    private suspend fun processMessage(message: AmqpMessage<T>) {
+        logger.debug { "Processing message: $message" }
+
+        val messageHasReplyPropertiesSet = message.replyTo != null && message.correlationId != null
+
+        if (replyingMode == AmqpReplyingMode.Always && !messageHasReplyPropertiesSet) {
+            logger.error {
+                "Replying mode is set to Always but received message with missing " +
+                        "replyTo and/or correlationId properties"
+            }
+            message.reject()
+            return
+        }
+
+        when (val result = messageHandler(message)) {
+            is Success -> {
+                logger.debug { "Message processing finished with Success, dispatching ACK" }
+                when (replyingMode) {
+                    AmqpReplyingMode.Always,
+                    AmqpReplyingMode.IfRequired -> if (messageHasReplyPropertiesSet) {
+                        try {
+                            val payload = Json.encodeToString(replyPayloadSerializer, result.value)
+                            logger.debug { "Message processing finished with Success, dispatching REPLY" }
+                            message.reply(payload, message.replyTo!!, message.correlationId!!)
+                        } catch (e: Exception) {
+                            logger.debug { "Unable to send reply message ${e.message}" }
+                        }
+                    }
+                    AmqpReplyingMode.Never -> if (result.value !is Unit) {
+                        logger.warn {
+                            "Replying mode is set to Never but message handler returned non-Unit result"
+                        }
+                    }
+                }
+                message.acknowledge()
+            }
+            is Failure -> {
+                logger.debug { "Message processing finished with Failure, dispatching REJECT" }
+                message.reject()
+            }
+        }
+    }
+
+    private fun getQueuePropertiesString(): String = queueSpec.run {
         mutableSetOf<String>().apply {
             if (durable) add("durable")
             if (exclusive) add("exclusive")
             if (autoDelete) add("autoDelete")
         }.joinToString(" ")
-    }
-
-    private fun launchProcessingWorkers(
-        workersChannel: KChannel<AmqpMessage<T>>
-    ) = repeat(numberOfWorkers) { workerIndex ->
-        /* Processing workers coroutines are executed on a custom specified coroutine scope */
-        workersCoroutineScope.launch(Dispatchers.Default) {
-            logger.debug { "Message processing worker [$workerIndex] started for [${queueSpec.name}]" }
-
-            while (true) {
-                val message = workersChannel.receive()
-                logger.debug { "Processing message" }
-
-                val messageHasReplyPropertiesSet = message.replyTo != null && message.correlationId != null
-
-                if (replyingMode == AmqpReplyingMode.Always && !messageHasReplyPropertiesSet) {
-                    logger.error {
-                        "Replying mode is set to Always but received message with missing " +
-                                "replyTo and/or correlationId properties"
-                    }
-                    message.reject()
-                    continue
-                }
-
-                when (val result = messageHandler(message)) {
-                    is Success -> {
-                        logger.debug { "Message processing finished with Success, dispatching ACK" }
-                        when(replyingMode) {
-                            AmqpReplyingMode.Always,
-                            AmqpReplyingMode.IfRequired -> if (messageHasReplyPropertiesSet) {
-                                try {
-                                    val payload = Json.encodeToString(replyPayloadSerializer, result.value)
-                                    logger.debug { "Message processing finished with Success, dispatching REPLY" }
-                                    message.reply(payload, message.replyTo!!, message.correlationId!!)
-                                } catch (e: Exception) {
-                                    logger.debug { "Unable to send reply message ${e.message}" }
-                                }
-                            }
-                            AmqpReplyingMode.Never -> if (result.value !is Unit) {
-                                logger.warn {
-                                    "Replying mode is set to Never but message handler returned non-Unit result"
-                                }
-                            }
-                        }
-                        message.acknowledge()
-                    }
-                    is Failure -> {
-                        logger.debug { "Message processing finished with Failure, dispatching REJECT" }
-                        message.reject()
-                    }
-                }
-            }
-        }
     }
 
     private fun getReplyCallback(
@@ -230,7 +214,7 @@ class AmqpConsumer<T: Any, U: Any>(
                         .build()
 
                     @Suppress("BlockingMethodInNonBlockingContext")
-                    amqpChannel.basicPublish("",  replyTo, replyProperties, serializedPayload.toByteArray())
+                    amqpChannel.basicPublish("", replyTo, replyProperties, serializedPayload.toByteArray())
                 } catch (e: IOException) {
                     logger.debug { "AMQP Consumer - failed to send reply" }
                 }

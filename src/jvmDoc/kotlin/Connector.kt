@@ -115,7 +115,7 @@ fun basicSpringIntegration() {
 
                 consumer(::sampleProcessingFunction) {
                     /* Tell the consumer to run workers in our application-level coroutine scope */
-                    workersCoroutineScope = applicationCoroutineScope
+                    messageProcessingCoroutineScope = applicationCoroutineScope
 
                     /* Reminder of consumer setup here */
                 }
@@ -140,7 +140,7 @@ fun basicSpringIntegration() {
 
         val sampleRpcClient = connector.rpcClient<String> {
             /* Tell the RPC client to execute the reply-consumer in our application-level coroutine scope */
-            workersCoroutineScope = applicationCoroutineScope
+            messageProcessingCoroutineScope = applicationCoroutineScope
             /* Reminder of RPC client setup here */
         }
 

@@ -25,7 +25,7 @@ fun sampleRpcClient() {
     /* RPC client requests are routed to default topic, thus the routingKey identifies the target queue */
     val helloRpcClient = connector.rpcClient<SampleResponse> {
         routingKey = "profile-hello-rpc" // Default: ""
-        workersCoroutineScope = CoroutineScope(Dispatchers.Default) // Mandatory value
+        messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default) // Mandatory value
     }
 
     suspend fun getSampleResponse(request: SampleRequest): Outcome<AmqpError, SampleResponse> =

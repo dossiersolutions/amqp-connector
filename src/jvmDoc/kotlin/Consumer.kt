@@ -34,7 +34,7 @@ fun ConsumingAmqpConnectorConfigPrototype.sampleConsumerWithTemporaryQueue() {
      */
     consumer(::sampleProcessingFunction) {
         numberOfWorkers = 2
-        workersCoroutineScope = CoroutineScope(Dispatchers.Default)
+        messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
         exchange {
             name = "some-ref-data"
         }
@@ -52,7 +52,7 @@ fun ConsumingAmqpConnectorConfigPrototype.sampleConsumerWithPersistentQueue() {
      */
     consumer(::sampleProcessingFunction) {
         numberOfWorkers = 2
-        workersCoroutineScope = CoroutineScope(Dispatchers.Default)
+        messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
         exchange {
             name = "some-ref-data"
         }
@@ -77,7 +77,7 @@ fun ConsumingAmqpConnectorConfigPrototype.consumerWithExhaustiveConfiguration() 
     consumer(::sampleProcessingFunction) {
         numberOfWorkers = 4 // Default: 2
         workersPipeBuffer = 32 // Default: 16
-        workersCoroutineScope = CoroutineScope(Dispatchers.Default) // Mandatory value
+        messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default) // Mandatory value
         exchange {
             name = "some-ref-data" // Default: "" (default exchange)
             type = AmqpExchangeType.DIRECT // Default: AmqpExchangeType.TOPIC
