@@ -147,7 +147,7 @@ class AmqpConsumerPrototype<T: Any>(
 
         val (messageProcessingCoroutineScope) = messageProcessingCoroutineScope
             ?.let { Success(it) }
-            ?: Failure(AmqpConfigurationError("Consumer workersCoroutineScope must be specified"))
+            ?: Failure(AmqpConfigurationError("Consumer messageProcessingCoroutineScope must be specified"))
 
         val (exchangeSpec) = amqpExchangeSpecPrototype.build()
         val (queueSpec) = amqpQueueSpecPrototype.build()
@@ -235,7 +235,7 @@ class AmqpRpcClientPrototype<U: Any>(
 
         val (messageProcessingCoroutineScope) = messageProcessingCoroutineScope
             ?.let { Success(it) }
-            ?: Failure(AmqpConfigurationError("Consumer workersCoroutineScope must be specified"))
+            ?: Failure(AmqpConfigurationError("Consumer messageProcessingCoroutineScope must be specified"))
 
         Success(
             AmqpRpcClient(
