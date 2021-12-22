@@ -118,7 +118,10 @@ class FederationTest {
                 domain2Container.withFederation(FederationUpstream("crossdomain", crossdomainContainer, 2)).start()
             }
             launch {
-                crossdomainContainer.withFederation(FederationUpstream("domain1", domain1Container)).start()
+                crossdomainContainer.withFederation(
+                    FederationUpstream("domain1", domain1Container),
+                    FederationUpstream("domain2", domain2Container)
+                ).start()
             }
         }
     }
