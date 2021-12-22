@@ -22,9 +22,11 @@ import kotlin.coroutines.suspendCoroutine
 class FederationTest {
     private val network = Network.newNetwork()
     private val domain1Container = DossierRabbitMqContainer(network, "domain1")
+    private val domain2Container = DossierRabbitMqContainer(network, "domain2")
     private val crossdomainContainer = DossierRabbitMqContainer(network, "crossdomain")
 
     private lateinit var domain1Connector: PublishingConsumingAmqpConnectorImpl
+    private lateinit var domain2Connector: PublishingConsumingAmqpConnectorImpl
     private lateinit var crossdomainConnector: PublishingConsumingAmqpConnectorImpl
 
     private var suspended: Continuation<String>? = null
@@ -65,6 +67,18 @@ class FederationTest {
         assertEquals("domain1: hello from crossdomain", result)
     }
 
+    @Test
+    fun `should be possible to send messages between domains via crossdomain`() {
+        val sendMessage = domain1Connector.publisher { exchange { name = "federated.domain2" } }
+
+        val result = runBlocking {
+            sendMessage(AmqpMessage("hello from domain1"))
+            waitForConsumer()
+        }
+
+        assertEquals("domain2: hello from domain1", result)
+    }
+
     //@Disabled("TODO we need to add support for federated RPC (cannot use default exchange)")
     @Test
     fun `should be possible to send messages from domain to crossdomain using rpc`() {
@@ -85,6 +99,19 @@ class FederationTest {
         assertEquals("crossdomain-rpc-federated: rpc message from domain1", response.getOrElse { throw Exception() })
     }
 
+    @Disabled("TODO we need to add support for federated RPC (cannot use default exchange)")
+    @Test
+    fun `should be possible to send messages between domains via crossdomain using rpc`() {
+        val sendRequest = domain1Connector.rpcClient<String> {
+            exchange { name = "federated.domain2" }
+            messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
+        }
+
+        val response = runBlocking { sendRequest("rpc message from domain1") }
+
+        assertEquals("domain2-rpc-federated: rpc message from domain1", response.getOrElse { throw Exception() })
+    }
+
     @BeforeAll
     fun beforeAll() {
         startContainers()
@@ -94,10 +121,16 @@ class FederationTest {
     private fun startContainers() {
         runBlocking {
             launch {
-                domain1Container.withFederation(FederationUpstream("crossdomain", crossdomainContainer)).start()
+                domain1Container.withFederation(FederationUpstream("crossdomain", crossdomainContainer, 2)).start()
             }
             launch {
-                crossdomainContainer.withFederation(FederationUpstream("domain1", domain1Container)).start()
+                domain2Container.withFederation(FederationUpstream("crossdomain", crossdomainContainer, 2)).start()
+            }
+            launch {
+                crossdomainContainer.withFederation(
+                    FederationUpstream("domain1", domain1Container),
+                    FederationUpstream("domain2", domain2Container)
+                ).start()
             }
         }
     }
@@ -122,6 +155,19 @@ class FederationTest {
             }
         }
 
+        domain2Connector = connector(role = AmqpConnectorRole.PublisherAndConsumer) {
+            connectionString = domain2Container.amqpUrl
+
+            consumer({ message: AmqpMessage<String> ->
+                resumeWith("domain2: ${message.payload}")
+                Success("domain2-rpc-federated: ${message.payload}")
+            }) {
+                replyingMode = AmqpReplyingMode.IfRequired
+                messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
+                exchange { name = "federated.domain2" }
+            }
+        }
+
         crossdomainConnector = connector(role = AmqpConnectorRole.PublisherAndConsumer) {
             connectionString = crossdomainContainer.amqpUrl
 
@@ -137,8 +183,11 @@ class FederationTest {
 
         runBlocking {
             launch { domain1Container.waitForFederatedConsumer("federated.crossdomain") }
-            launch { crossdomainContainer.waitForFederatedConsumer("federated.replying.domain1") }
-            launch { crossdomainContainer.waitForFederatedConsumer("federated.domain1") }
+            launch { domain2Container.waitForFederatedConsumer("federated.crossdomain") }
+            launch {
+                crossdomainContainer.waitForFederatedConsumer("federated.domain1")
+                crossdomainContainer.waitForFederatedConsumer("federated.domain2")
+            }
         }
     }
 

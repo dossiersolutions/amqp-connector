@@ -6,7 +6,7 @@ import org.testcontainers.containers.Network
 import org.testcontainers.containers.RabbitMQContainer
 import org.testcontainers.utility.DockerImageName
 
-data class FederationUpstream(val name: String, val target: DossierRabbitMqContainer)
+data class FederationUpstream(val name: String, val target: DossierRabbitMqContainer, val maxHops: Int = 1)
 
 class DossierRabbitMqContainer(network: Network, networkAlias: String) :
     RabbitMQContainer(DockerImageName.parse("rabbitmq:3.7.25-management-alpine")) {
@@ -24,11 +24,11 @@ class DossierRabbitMqContainer(network: Network, networkAlias: String) :
             10,
             "exchanges"
         )
-        upstreams.forEach { (name, target) ->
+        upstreams.forEach { (name, target, maxHops) ->
             withParameter(
                 "federation-upstream",
                 name,
-                """{"uri":"amqp://${target.networkAliases.first()}:5672"}"""
+                """{"uri":"amqp://${target.networkAliases.first()}:5672","max-hops":$maxHops}"""
             )
         }
     }
