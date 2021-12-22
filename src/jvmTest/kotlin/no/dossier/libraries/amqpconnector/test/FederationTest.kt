@@ -4,7 +4,9 @@ import kotlinx.coroutines.*
 import no.dossier.libraries.amqpconnector.connector.PublishingConsumingAmqpConnectorImpl
 import no.dossier.libraries.amqpconnector.consumer.AmqpReplyingMode
 import no.dossier.libraries.amqpconnector.dsl.*
+import no.dossier.libraries.amqpconnector.primitives.AmqpExchangeType
 import no.dossier.libraries.amqpconnector.primitives.AmqpMessage
+import no.dossier.libraries.amqpconnector.primitives.AmqpMessageProperty
 import no.dossier.libraries.functional.Success
 import no.dossier.libraries.functional.getOrElse
 import org.junit.jupiter.api.*
@@ -63,15 +65,22 @@ class FederationTest {
         assertEquals("domain1: hello from crossdomain", result)
     }
 
-    @Disabled("TODO we need to add support for federated RPC (cannot use default exchange)")
+    //@Disabled("TODO we need to add support for federated RPC (cannot use default exchange)")
     @Test
     fun `should be possible to send messages from domain to crossdomain using rpc`() {
         val sendRequest = domain1Connector.rpcClient<String> {
             exchange { name = "federated.crossdomain" }
+            replyToExchange {
+                name = "federated.replying.domain1"
+                type = AmqpExchangeType.DIRECT
+            }
             messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
         }
 
-        val response = runBlocking { sendRequest("rpc message from domain1") }
+        val response = runBlocking {
+            launch { waitForConsumer() }
+            sendRequest("rpc message from domain1")
+        }
 
         assertEquals("crossdomain-rpc-federated: rpc message from domain1", response.getOrElse { throw Exception() })
     }
@@ -128,6 +137,7 @@ class FederationTest {
 
         runBlocking {
             launch { domain1Container.waitForFederatedConsumer("federated.crossdomain") }
+            launch { crossdomainContainer.waitForFederatedConsumer("federated.replying.domain1") }
             launch { crossdomainContainer.waitForFederatedConsumer("federated.domain1") }
         }
     }

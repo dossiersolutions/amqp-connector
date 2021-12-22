@@ -8,6 +8,8 @@ import no.dossier.libraries.amqpconnector.dsl.publisher
 import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
 import no.dossier.libraries.amqpconnector.error.AmqpError
 import no.dossier.libraries.amqpconnector.error.AmqpPublishingError
+import no.dossier.libraries.amqpconnector.primitives.AmqpBindingKey
+import no.dossier.libraries.amqpconnector.primitives.AmqpBindingKey.Custom
 import no.dossier.libraries.amqpconnector.primitives.AmqpMessage
 import no.dossier.libraries.amqpconnector.test.utils.SuspendableSignalAwaiterWithTimeout
 import no.dossier.libraries.functional.Failure
@@ -34,7 +36,7 @@ class SendAndReceiveMessageTest {
             consumer(onMessage) {
                 messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
                 exchange { name = "somedata-exchange" }
-                bindingKey = "somedata.#"
+                bindingKey = Custom("somedata.#")
             }
         }
 

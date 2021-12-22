@@ -8,12 +8,18 @@ import no.dossier.libraries.functional.Success
 enum class AmqpMessageProperty {
     USER,
     API_KEY,
+    REPLY_TO_EXCHANGE
 }
 
 data class AmqpMessage<T>(
     val payload: T,
     val headers: Map<String, String> = mapOf(),
-    val reply: suspend (serializedPayload: String, replyTo: String, correlationId: String) -> Unit = { _, _, _ ->  },
+    val reply: suspend (
+        serializedPayload: String,
+        replyTo: String,
+        correlationId: String,
+        replyToExchange: String
+    ) -> Unit = { _, _, _, _ ->  },
     val acknowledge: suspend () -> Unit = { },
     val reject: suspend () -> Unit = { },
     val replyTo: String? = null,

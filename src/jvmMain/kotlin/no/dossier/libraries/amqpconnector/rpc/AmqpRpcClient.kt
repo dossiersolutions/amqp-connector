@@ -25,6 +25,8 @@ class AmqpRpcClient<U: Any>(
     @PublishedApi
     internal val messageProcessingCoroutineScope: CoroutineScope,
     private val publishingExchangeSpec: AmqpExchangeSpec,
+    @PublishedApi
+    internal  val consumingExchangeSpec: AmqpExchangeSpec,
     private val routingKey: String,
     private val publishingConnection: Connection,
     private val consumingConnection: Connection,
@@ -84,28 +86,23 @@ class AmqpRpcClient<U: Any>(
     }
 
     init {
-        val defaultExchangeSpec = AmqpExchangeSpec(
-            name = "", //unused for Default
-            type = AmqpExchangeType.DEFAULT
-        )
-
         val queueSpec = AmqpQueueSpec(
-            name = "", //Empty string means that the name will be assigned by the brokerExecutorCoroutineDispatcher
+            name = "", // Empty string means that the name will be assigned by the brokerExecutorCoroutineDispatcher
             durable = false,
             exclusive = true,
             autoDelete = true
         )
 
         val deadLetterSpec = AmqpDeadLetterSpec(
-            enabled = false, //Since the dead letter forwarding is disabled, the below arguments are not relevant
-            exchangeSpec = defaultExchangeSpec,
+            enabled = false, // Since the dead letter forwarding is disabled, the below arguments are not relevant
+            exchangeSpec = consumingExchangeSpec,
             routingKey = DeadLetterRoutingKey.SameAsOriginalMessage,
             implicitQueueEnabled = false
         )
 
         consumer = AmqpConsumer(
-            defaultExchangeSpec,
-            "",
+            consumingExchangeSpec,
+            AmqpBindingKey.QueueName, // Will be used only if consumingExchangeSpec.type is DIRECT
             responseMessageHandler,
             responsePayloadSerializer,
             serializer(),
@@ -134,10 +131,16 @@ class AmqpRpcClient<U: Any>(
     ): Outcome<AmqpRpcError, U> {
         val correlationId = UUID.randomUUID()
 
+        val refinedHeaders =
+            if (consumingExchangeSpec.name != "")
+                headers + (AmqpMessageProperty.REPLY_TO_EXCHANGE.name to consumingExchangeSpec.name)
+            else
+                headers
+
         val message = AmqpMessage(
             payload,
-            headers,
-            { _, _, _ ->  },
+            refinedHeaders,
+            { _, _, _, _ ->  },
             { },
             { },
             consumerQueueName,
