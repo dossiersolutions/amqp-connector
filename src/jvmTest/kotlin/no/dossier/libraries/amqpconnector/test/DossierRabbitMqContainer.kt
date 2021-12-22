@@ -15,35 +15,22 @@ class DossierRabbitMqContainer(network: Network, networkAlias: String) :
         withNetworkAliases(networkAlias)
     }
 
-    fun start(vararg upstream: FederationUpstream) {
-        super.start()
-        enableFederation(*upstream)
-    }
-
-    private fun enableFederation(vararg upstreams: FederationUpstream) = apply {
-        execInContainer("rabbitmq-plugins", "enable", "rabbitmq_federation")
-        execInContainer(
-            "rabbitmqctl",
-            "set_policy",
+    fun withFederation(vararg upstreams: FederationUpstream) = apply {
+        withPluginsEnabled("rabbitmq_federation")
+        withPolicy(
             "exchange-federation",
-            """^federated\.""",
-            """{"federation-upstream-set":"all"}""",
-            "--priority",
-            "10",
-            "--apply-to",
+            "^federated\\.",
+            mapOf("federation-upstream-set" to "all"),
+            10,
             "exchanges"
         )
-        upstreams.forEach { (name, target) -> addFederationUpstream(name, target) }
-    }
-
-    private fun addFederationUpstream(name: String, target: DossierRabbitMqContainer) = apply {
-        execInContainer(
-            "rabbitmqctl",
-            "set_parameter",
-            "federation-upstream",
-            name,
-            """{"uri":"amqp://${target.networkAliases.first()}:5672"}"""
-        )
+        upstreams.forEach { (name, target) ->
+            withParameter(
+                "federation-upstream",
+                name,
+                """{"uri":"amqp://${target.networkAliases.first()}:5672"}"""
+            )
+        }
     }
 
     suspend fun waitForFederatedConsumer(name: String, timeoutMs: Long = 1000) {

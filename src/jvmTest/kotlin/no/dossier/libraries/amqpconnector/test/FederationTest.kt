@@ -85,10 +85,10 @@ class FederationTest {
     private fun startContainers() {
         runBlocking {
             launch {
-                domain1Container.start(FederationUpstream("crossdomain", crossdomainContainer))
+                domain1Container.withFederation(FederationUpstream("crossdomain", crossdomainContainer)).start()
             }
             launch {
-                crossdomainContainer.start(FederationUpstream("domain1", domain1Container))
+                crossdomainContainer.withFederation(FederationUpstream("domain1", domain1Container)).start()
             }
         }
     }
