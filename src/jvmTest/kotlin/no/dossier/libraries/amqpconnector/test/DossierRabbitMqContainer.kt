@@ -36,7 +36,7 @@ class DossierRabbitMqContainer(network: Network, networkAlias: String) :
     suspend fun waitForFederatedConsumer(name: String, timeoutMs: Long = 1000) {
         val pattern = Regex("^federation: $name", RegexOption.MULTILINE)
         withTimeout(timeoutMs) {
-            while (execInContainer("rabbitmqctl", "list_consumers").stdout.contains(pattern)) {
+            while (!execInContainer("rabbitmqctl", "list_consumers").stdout.contains(pattern)) {
                 println("waiting for consumer: $name")
                 delay(100)
             }

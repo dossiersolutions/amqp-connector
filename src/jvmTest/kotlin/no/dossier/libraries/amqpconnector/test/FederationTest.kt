@@ -69,7 +69,7 @@ class FederationTest {
     @Test
     fun `should be possible to send messages from domain to crossdomain using rpc`() {
         val sendRequest = domain1Connector.rpcClient<String> {
-            exchange { name = "federated.crossdomain" }
+            exchange { name = "federated.crossdomain.rpc" }
             replyToExchange {
                 name = "federated.replying.domain1"
                 type = AmqpExchangeType.DIRECT
@@ -78,7 +78,6 @@ class FederationTest {
         }
 
         val response = runBlocking {
-            launch { waitForConsumer() }
             sendRequest("rpc message from domain1")
         }
 
@@ -126,6 +125,14 @@ class FederationTest {
             connectionString = crossdomainContainer.amqpUrl
 
             consumer({ message: AmqpMessage<String> ->
+                Success("crossdomain-rpc-federated: ${message.payload}")
+            }) {
+                replyingMode = AmqpReplyingMode.IfRequired
+                messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
+                exchange { name = "federated.crossdomain.rpc" }
+            }
+
+            consumer({ message: AmqpMessage<String> ->
                 resumeWith("crossdomain: ${message.payload}")
                 Success("crossdomain-rpc-federated: ${message.payload}")
             }) {
@@ -137,7 +144,6 @@ class FederationTest {
 
         runBlocking {
             launch { domain1Container.waitForFederatedConsumer("federated.crossdomain") }
-            launch { crossdomainContainer.waitForFederatedConsumer("federated.replying.domain1") }
             launch { crossdomainContainer.waitForFederatedConsumer("federated.domain1") }
         }
     }
