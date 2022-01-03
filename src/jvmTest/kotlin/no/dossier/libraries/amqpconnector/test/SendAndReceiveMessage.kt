@@ -8,12 +8,15 @@ import no.dossier.libraries.amqpconnector.dsl.publisher
 import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
 import no.dossier.libraries.amqpconnector.error.AmqpError
 import no.dossier.libraries.amqpconnector.error.AmqpPublishingError
+import no.dossier.libraries.amqpconnector.primitives.AmqpBindingKey
+import no.dossier.libraries.amqpconnector.primitives.AmqpBindingKey.Custom
 import no.dossier.libraries.amqpconnector.primitives.AmqpMessage
 import no.dossier.libraries.amqpconnector.test.utils.SuspendableSignalAwaiterWithTimeout
 import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Outcome
 import no.dossier.libraries.functional.Success
 import org.junit.jupiter.api.*
+import org.testcontainers.containers.Network
 import org.testcontainers.containers.RabbitMQContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
@@ -33,7 +36,7 @@ class SendAndReceiveMessageTest {
             consumer(onMessage) {
                 messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
                 exchange { name = "somedata-exchange" }
-                bindingKey = "somedata.#"
+                bindingKey = Custom("somedata.#")
             }
         }
 
@@ -49,8 +52,7 @@ class SendAndReceiveMessageTest {
     }
 
     @Container
-    val rabbitMQContainer: RabbitMQContainer =
-        RabbitMQContainer(DockerImageName.parse("rabbitmq:3.7.25-management-alpine"))
+    val rabbitMQContainer: RabbitMQContainer = DossierRabbitMqContainer(Network.newNetwork(), "rabbitmq")
 
     lateinit var sampleAmqpService: SampleAmqpService
     lateinit var signalAwaiter: SuspendableSignalAwaiterWithTimeout<AmqpError, String>

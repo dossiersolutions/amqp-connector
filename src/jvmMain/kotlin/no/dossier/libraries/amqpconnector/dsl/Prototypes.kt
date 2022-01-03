@@ -13,6 +13,7 @@ import no.dossier.libraries.amqpconnector.consumer.AmqpConsumer
 import no.dossier.libraries.amqpconnector.consumer.AmqpReplyingMode
 import no.dossier.libraries.amqpconnector.error.AmqpConfigurationError
 import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
+import no.dossier.libraries.amqpconnector.error.AmqpRpcError
 import no.dossier.libraries.amqpconnector.primitives.*
 import no.dossier.libraries.amqpconnector.publisher.AmqpPublisher
 import no.dossier.libraries.amqpconnector.rpc.AmqpRpcClient
@@ -119,7 +120,7 @@ class AmqpDeadLetterSpecPrototype(
 
 @AmqpConnectorDsl
 class AmqpConsumerPrototype<T: Any>(
-    var bindingKey: String = "#",
+    var bindingKey: AmqpBindingKey = AmqpBindingKey.Custom("#"),
     var replyingMode: AmqpReplyingMode = AmqpReplyingMode.Never,
     var messageProcessingCoroutineScope: CoroutineScope? = null
 ) {
@@ -147,7 +148,7 @@ class AmqpConsumerPrototype<T: Any>(
 
         val (messageProcessingCoroutineScope) = messageProcessingCoroutineScope
             ?.let { Success(it) }
-            ?: Failure(AmqpConfigurationError("Consumer workersCoroutineScope must be specified"))
+            ?: Failure(AmqpConfigurationError("Consumer messageProcessingCoroutineScope must be specified"))
 
         val (exchangeSpec) = amqpExchangeSpecPrototype.build()
         val (queueSpec) = amqpQueueSpecPrototype.build()
@@ -220,8 +221,16 @@ class AmqpRpcClientPrototype<U: Any>(
         type = AmqpExchangeType.DEFAULT // overridden default value
     }
 
+    private val amqpReplyToExchangeSpecPrototype = AmqpExchangeSpecPrototype().apply {
+        type = AmqpExchangeType.DEFAULT
+    }
+
     fun exchange(builder: AmqpExchangeSpecPrototype.() -> Unit) {
         amqpExchangeSpecPrototype.apply(builder)
+    }
+
+    fun replyToExchange(builder: AmqpExchangeSpecPrototype.() -> Unit) {
+        amqpReplyToExchangeSpecPrototype.apply(builder)
     }
 
     fun build(
@@ -232,16 +241,29 @@ class AmqpRpcClientPrototype<U: Any>(
     ): Outcome<AmqpConfigurationError, AmqpRpcClient<U>> = attemptBuildResult {
 
         val (exchangeSpec) = amqpExchangeSpecPrototype.build()
+        val (replyToExchangeSpec) = amqpReplyToExchangeSpecPrototype.build()
+
+        if ((replyToExchangeSpec.name == "" && replyToExchangeSpec.type != AmqpExchangeType.DEFAULT)
+            || (replyToExchangeSpec.name != "" && replyToExchangeSpec.type != AmqpExchangeType.DIRECT)) {
+
+            !(Failure(
+                AmqpConfigurationError(
+                "AMQP RPC Client - The replyToExchange type must be either DEFAULT or DIRECT. " +
+                        "In case it is DIRECT, it must have a non-empty name"
+                )
+            ) as Outcome<AmqpConfigurationError, *>)
+        }
 
         val (messageProcessingCoroutineScope) = messageProcessingCoroutineScope
             ?.let { Success(it) }
-            ?: Failure(AmqpConfigurationError("Consumer workersCoroutineScope must be specified"))
+            ?: Failure(AmqpConfigurationError("Consumer messageProcessingCoroutineScope must be specified"))
 
         Success(
             AmqpRpcClient(
                 responsePayloadSerializer,
                 messageProcessingCoroutineScope,
                 exchangeSpec,
+                replyToExchangeSpec,
                 routingKey,
                 publishingConnection,
                 consumingConnection,

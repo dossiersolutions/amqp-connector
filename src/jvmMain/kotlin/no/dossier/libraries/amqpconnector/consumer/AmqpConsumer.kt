@@ -12,12 +12,11 @@ import no.dossier.libraries.amqpconnector.primitives.*
 import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Outcome
 import no.dossier.libraries.functional.Success
-import no.dossier.libraries.stl.suspendCancellableCoroutineWithTimeout
 import java.io.IOException
 
 class AmqpConsumer<T : Any, U : Any>(
     private val exchangeSpec: AmqpExchangeSpec,
-    private val bindingKey: String,
+    private val bindingKey: AmqpBindingKey,
     private val messageHandler: suspend (AmqpMessage<T>) -> Outcome<AmqpConsumingError, U>,
     private val serializer: KSerializer<T>,
     private val replyPayloadSerializer: KSerializer<U>,
@@ -55,10 +54,15 @@ class AmqpConsumer<T : Any, U : Any>(
             "Consumer queue (${getQueuePropertiesString()}) [$actualQueueName] created"
         }
 
+        val actualBindingKey = when (bindingKey) {
+            is AmqpBindingKey.QueueName -> actualQueueName
+            is AmqpBindingKey.Custom -> bindingKey.key
+        }
+
         if (exchangeSpec.type != AmqpExchangeType.DEFAULT) {
             exchangeDeclare(exchangeSpec.name, exchangeSpec.type.stringRepresentation)
             logger.debug { "Exchange [${exchangeSpec.name}] created" }
-            queueBind(actualQueueName, exchangeSpec.name, bindingKey)
+            queueBind(actualQueueName, exchangeSpec.name, actualBindingKey)
             logger.debug {
                 "Queue [$actualQueueName] created bound to [${exchangeSpec.name}]"
             }
@@ -106,10 +110,10 @@ class AmqpConsumer<T : Any, U : Any>(
         val actualMainQueueName = createMainExchangesAndQueue(amqpChannel)
         createErrorExchangesAndQueue(amqpChannel, actualMainQueueName)
 
-        amqpChannel.basicConsume(queueSpec.name, false, { _, delivery ->
+        amqpChannel.basicConsume(actualMainQueueName, false, { _, delivery ->
             /* This is executed in the AMQP client consumer thread */
             logger.debug {
-                "→ \uD83D\uDCE8️ AMQP Consumer - forwarding message to processing workers via coroutine channel"
+                "→ \uD83D\uDCE8️ AMQP Consumer - launching message processing coroutine"
             }
 
             try {
@@ -168,7 +172,8 @@ class AmqpConsumer<T : Any, U : Any>(
                         try {
                             val payload = Json.encodeToString(replyPayloadSerializer, result.value)
                             logger.debug { "Message processing finished with Success, dispatching REPLY" }
-                            message.reply(payload, message.replyTo!!, message.correlationId!!)
+                            val replyToExchange = message.headers[AmqpMessageProperty.REPLY_TO_EXCHANGE.name] ?: ""
+                            message.reply(payload, message.replyTo!!, message.correlationId!!, replyToExchange)
                         } catch (e: Exception) {
                             logger.debug { "Unable to send reply message ${e.message}" }
                         }
@@ -199,8 +204,8 @@ class AmqpConsumer<T : Any, U : Any>(
     private fun getReplyCallback(
         consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher,
         amqpChannel: Channel
-    ): suspend (serializedPayload: String, replyTo: String, correlationId: String) -> Unit =
-        { serializedPayload, replyTo, correlationId ->
+    ): suspend (serializedPayload: String, replyTo: String, correlationId: String, replyToExchange: String) -> Unit =
+        { serializedPayload, replyTo, correlationId, replyToExchange ->
             /* Reply callbacks are dispatched back to the AMQP client consumer thread pool */
             withContext(consumerThreadPoolDispatcher) {
                 logger.debug {
@@ -214,7 +219,7 @@ class AmqpConsumer<T : Any, U : Any>(
                         .build()
 
                     @Suppress("BlockingMethodInNonBlockingContext")
-                    amqpChannel.basicPublish("", replyTo, replyProperties, serializedPayload.toByteArray())
+                    amqpChannel.basicPublish(replyToExchange, replyTo, replyProperties, serializedPayload.toByteArray())
                 } catch (e: IOException) {
                     logger.debug { "AMQP Consumer - failed to send reply" }
                 }
