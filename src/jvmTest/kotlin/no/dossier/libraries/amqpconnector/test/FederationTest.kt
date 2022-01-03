@@ -92,23 +92,30 @@ class FederationTest {
         }
 
         val response = runBlocking {
+            crossdomainContainer.waitForFederatedConsumer("federated.replying.domain1")
             sendRequest("rpc message from domain1")
         }
 
-        assertEquals("crossdomain-rpc-federated: rpc message from domain1", response.getOrElse { throw Exception() })
+        assertEquals("crossdomain-rpc-federated: rpc message from domain1", response.getOrElse { throw Exception(it.error.message) })
     }
 
-    @Disabled("TODO we need to add support for federated RPC (cannot use default exchange)")
     @Test
     fun `should be possible to send messages between domains via crossdomain using rpc`() {
         val sendRequest = domain1Connector.rpcClient<String> {
-            exchange { name = "federated.domain2" }
+            exchange { name = "federated.domain2.rpc" }
+            replyToExchange {
+                name = "federated.replying.domain1"
+                type = AmqpExchangeType.DIRECT
+            }
             messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
         }
 
-        val response = runBlocking { sendRequest("rpc message from domain1") }
+        val response = runBlocking {
+            crossdomainContainer.waitForFederatedConsumer("federated.replying.domain1")
+            sendRequest("rpc message from domain1")
+        }
 
-        assertEquals("domain2-rpc-federated: rpc message from domain1", response.getOrElse { throw Exception() })
+        assertEquals("domain2-rpc-federated: rpc message from domain1", response.getOrElse { throw Exception(it.error.message) })
     }
 
     @BeforeAll
@@ -156,6 +163,14 @@ class FederationTest {
 
         domain2Connector = connector(role = AmqpConnectorRole.PublisherAndConsumer) {
             connectionString = domain2Container.amqpUrl
+
+            consumer({ message: AmqpMessage<String> ->
+                Success("domain2-rpc-federated: ${message.payload}")
+            }) {
+                replyingMode = AmqpReplyingMode.IfRequired
+                messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
+                exchange { name = "federated.domain2.rpc" }
+            }
 
             consumer({ message: AmqpMessage<String> ->
                 resumeWith("domain2: ${message.payload}")
