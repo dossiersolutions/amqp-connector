@@ -79,7 +79,6 @@ class FederationTest {
         assertEquals("domain2: hello from domain1", result)
     }
 
-    //@Disabled("TODO we need to add support for federated RPC (cannot use default exchange)")
     @Test
     fun `should be possible to send messages from domain to crossdomain using rpc`() {
         val sendRequest = domain1Connector.rpcClient<String> {
@@ -96,7 +95,9 @@ class FederationTest {
             sendRequest("rpc message from domain1")
         }
 
-        assertEquals("crossdomain-rpc-federated: rpc message from domain1", response.getOrElse { throw Exception(it.error.message) })
+        assertEquals(
+            "crossdomain-rpc-federated: rpc message from domain1",
+            response.getOrElse { throw Exception(it.error.message) })
     }
 
     @Test
@@ -115,7 +116,9 @@ class FederationTest {
             sendRequest("rpc message from domain1")
         }
 
-        assertEquals("domain2-rpc-federated: rpc message from domain1", response.getOrElse { throw Exception(it.error.message) })
+        assertEquals(
+            "domain2-rpc-federated: rpc message from domain1",
+            response.getOrElse { throw Exception(it.error.message) })
     }
 
     @BeforeAll
@@ -217,6 +220,7 @@ class FederationTest {
     fun stopContainers() {
         crossdomainContainer.stop()
         domain1Container.stop()
+        domain2Container.stop()
     }
 
     private suspend fun waitForConsumer() = suspendCoroutine<String> { suspended = it }

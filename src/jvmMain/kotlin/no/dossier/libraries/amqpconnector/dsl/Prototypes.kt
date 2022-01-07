@@ -244,12 +244,12 @@ class AmqpRpcClientPrototype<U: Any>(
         val (replyToExchangeSpec) = amqpReplyToExchangeSpecPrototype.build()
 
         if ((replyToExchangeSpec.name == "" && replyToExchangeSpec.type != AmqpExchangeType.DEFAULT)
-            || (replyToExchangeSpec.name != "" && replyToExchangeSpec.type != AmqpExchangeType.DIRECT)) {
+            || (replyToExchangeSpec.name != "" && replyToExchangeSpec.type !in setOf(AmqpExchangeType.DIRECT, AmqpExchangeType.TOPIC))) {
 
             !(Failure(
                 AmqpConfigurationError(
-                "AMQP RPC Client - The replyToExchange type must be either DEFAULT or DIRECT. " +
-                        "In case it is DIRECT, it must have a non-empty name"
+                "AMQP RPC Client - The replyToExchange type must be either DEFAULT, DIRECT, or TOPIC. " +
+                        "In case it is DIRECT / TOPIC, it must have a non-empty name"
                 )
             ) as Outcome<AmqpConfigurationError, *>)
         }
