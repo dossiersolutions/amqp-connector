@@ -16,6 +16,7 @@ import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Outcome
 import no.dossier.libraries.functional.Success
 import org.junit.jupiter.api.*
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.testcontainers.containers.Network
 import org.testcontainers.containers.RabbitMQContainer
 import org.testcontainers.junit.jupiter.Container
@@ -38,6 +39,12 @@ class SendAndReceiveMessageTest {
                 exchange { name = "somedata-exchange" }
                 bindingKey = Custom("somedata.#")
             }
+
+            consumer({ it: AmqpMessage<String> -> onMessage(it.copy(payload = "other: ${it.payload}")) }) {
+                messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
+                exchange { name = "somedata-exchange" }
+                bindingKey = Custom("other.#")
+            }
         }
 
         val publisher = connector.publisher {
@@ -48,7 +55,12 @@ class SendAndReceiveMessageTest {
         suspend fun sendSamplePublication(request: String): Outcome<AmqpPublishingError, Unit> =
             publisher(AmqpMessage(request))
 
-        fun shutdown() { connector.shutdown() }
+        suspend fun sendSamplePublication(request: String, routingKey: String): Outcome<AmqpPublishingError, Unit> =
+            publisher(AmqpMessage(request), routingKey)
+
+        fun shutdown() {
+            connector.shutdown()
+        }
     }
 
     @Container
@@ -92,7 +104,23 @@ class SendAndReceiveMessageTest {
 
         when (receivingOutcome) {
             is Failure -> fail(receivingOutcome.error.message)
-            is Success -> Assertions.assertEquals("Test", receivingOutcome.value)
+            is Success -> assertEquals("Test", receivingOutcome.value)
+        }
+    }
+
+    @Test
+    fun `should be possible to override routing in publisher invocations`() {
+        val receivingOutcome = runBlocking {
+            signalAwaiter.runAndAwaitSignal {
+                runBlocking {
+                    sampleAmqpService.sendSamplePublication("Test", "other.data")
+                }
+            }
+        }
+
+        when (receivingOutcome) {
+            is Failure -> fail(receivingOutcome.error.message)
+            is Success -> assertEquals("other: Test", receivingOutcome.value)
         }
     }
 }
