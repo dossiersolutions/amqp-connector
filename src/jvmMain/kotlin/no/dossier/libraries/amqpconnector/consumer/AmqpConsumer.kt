@@ -17,7 +17,7 @@ import java.io.IOException
 class AmqpConsumer<T : Any, U : Any>(
     private val exchangeSpec: AmqpExchangeSpec,
     private val bindingKey: AmqpBindingKey,
-    private val messageHandler: suspend (AmqpMessage<T>) -> Outcome<AmqpConsumingError, U>,
+    private val messageHandler: suspend (AmqpInboundMessage<T>) -> Outcome<AmqpConsumingError, U>,
     private val serializer: KSerializer<T>,
     private val replyPayloadSerializer: KSerializer<U>,
     private val queueSpec: AmqpQueueSpec,
@@ -119,7 +119,7 @@ class AmqpConsumer<T : Any, U : Any>(
             try {
                 /* But the processing of the message should be dispatched to the workers thread pool */
                 messageProcessingCoroutineScope.launch {
-                    processMessage(AmqpMessage(
+                    processMessage(AmqpInboundMessage(
                         headers = delivery.properties.headers?.mapValues { it.value.toString() } ?: emptyMap(),
                         payload = Json.decodeFromString(serializer, String(delivery.body)),
                         reply = getReplyCallback(consumerThreadPoolDispatcher, amqpChannel),
@@ -136,7 +136,8 @@ class AmqpConsumer<T : Any, U : Any>(
                             false
                         ),
                         replyTo = delivery.properties.replyTo,
-                        correlationId = delivery.properties.correlationId
+                        correlationId = delivery.properties.correlationId,
+                        routingKey = delivery.envelope.routingKey
                     ))
                 }
             } catch (e: Exception) {
@@ -149,7 +150,7 @@ class AmqpConsumer<T : Any, U : Any>(
         return actualMainQueueName
     }
 
-    private suspend fun processMessage(message: AmqpMessage<T>) {
+    private suspend fun processMessage(message: AmqpInboundMessage<T>) {
         logger.debug { "Processing message: $message" }
 
         val messageHasReplyPropertiesSet = message.replyTo != null && message.correlationId != null

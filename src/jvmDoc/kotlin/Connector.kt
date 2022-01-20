@@ -8,7 +8,7 @@ import no.dossier.libraries.amqpconnector.dsl.*
 import no.dossier.libraries.amqpconnector.dsl.AmqpConnectorRole.*
 import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
 import no.dossier.libraries.amqpconnector.error.AmqpRpcError
-import no.dossier.libraries.amqpconnector.primitives.AmqpMessage
+import no.dossier.libraries.amqpconnector.primitives.AmqpInboundMessage
 import no.dossier.libraries.functional.Outcome
 import no.dossier.libraries.functional.Success
 
@@ -32,7 +32,7 @@ fun basicConsumingConnectorInitialization() {
         }
 
         /* A sample message processing function */
-        fun sampleProcessingFunction(message: AmqpMessage<String>): Outcome<AmqpConsumingError, Unit> {
+        fun sampleProcessingFunction(message: AmqpInboundMessage<String>): Outcome<AmqpConsumingError, Unit> {
             /*
              * The Outcome indicates whether the processing was successful and the message should be ACKed
              * or not and the message should be rejected. Also, when implementing RPC server, the Success value
@@ -57,7 +57,7 @@ fun basicPublishingConnectorInitialization() {
 
         /* Note that publisher invocation must be done from coroutine scope therefore this is suspending function */
         suspend fun sendSampleMessage(msg: String) {
-            samplePublisher(AmqpMessage(msg))
+            samplePublisher(AmqpInboundMessage(msg))
         }
     }
 }
@@ -75,7 +75,7 @@ fun basicPublishingAndConsumingConnectorInitialization() {
         }
 
         /* Note that publisher invocation must be done from coroutine scope therefore this is suspending function */
-        suspend fun sendSampleMessage(msg: String): Outcome<AmqpRpcError, String> = sampleRpcClient(AmqpMessage(msg))
+        suspend fun sendSampleMessage(msg: String): Outcome<AmqpRpcError, String> = sampleRpcClient(AmqpInboundMessage(msg))
     }
 }
 
@@ -123,7 +123,7 @@ fun basicSpringIntegration() {
         }
 
         /* Message processing function */
-        fun sampleProcessingFunction(message: AmqpMessage<String>): Outcome<AmqpConsumingError, Unit> {
+        fun sampleProcessingFunction(message: AmqpInboundMessage<String>): Outcome<AmqpConsumingError, Unit> {
             return Success(Unit)
         }
     }
@@ -144,7 +144,7 @@ fun basicSpringIntegration() {
             /* Reminder of RPC client setup here */
         }
 
-        suspend fun sendSampleMessage(msg: String): Outcome<AmqpRpcError, String> = sampleRpcClient(AmqpMessage(msg))
+        suspend fun sendSampleMessage(msg: String): Outcome<AmqpRpcError, String> = sampleRpcClient(AmqpInboundMessage(msg))
     }
 
     /*

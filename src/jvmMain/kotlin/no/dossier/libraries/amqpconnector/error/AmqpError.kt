@@ -1,6 +1,6 @@
 package no.dossier.libraries.amqpconnector.error
 
-import no.dossier.libraries.amqpconnector.primitives.AmqpMessage
+import no.dossier.libraries.amqpconnector.primitives.AmqpOutboundMessage
 import no.dossier.libraries.errorhandling.InternalError
 
 sealed class AmqpError: InternalError()
@@ -23,7 +23,7 @@ class AmqpConnectionError(
 class AmqpPublishingError(
     override val message: String,
     override val causes: Map<String, AmqpError> = emptyMap(),
-    val amqpMessage: AmqpMessage<*>
+    val amqpMessage: AmqpOutboundMessage<*>
 ) : AmqpError()
 
 class AmqpConsumingError(

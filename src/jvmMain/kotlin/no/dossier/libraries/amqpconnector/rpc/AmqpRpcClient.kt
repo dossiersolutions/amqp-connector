@@ -50,7 +50,7 @@ class AmqpRpcClient<U: Any>(
     @PublishedApi
     internal val pendingRequestsMap: ConcurrentMap<UUID, CancellableContinuation<Outcome<AmqpRpcError, U>>> = ConcurrentHashMap()
 
-    private val responseMessageHandler: (message: AmqpMessage<U>) -> Outcome<AmqpConsumingError, Unit> = { message ->
+    private val responseMessageHandler: (message: AmqpInboundMessage<U>) -> Outcome<AmqpConsumingError, Unit> = { message ->
         logger.debug { "AMQP RPC Client - Received reply message with correlation ID: [${message.correlationId}]" }
 
         val correlationIdResult = message.correlationId
@@ -137,12 +137,9 @@ class AmqpRpcClient<U: Any>(
             else
                 headers
 
-        val message = AmqpMessage(
+        val message = AmqpOutboundMessage(
             payload,
             refinedHeaders,
-            { _, _, _, _ ->  },
-            { },
-            { },
             consumerQueueName,
             correlationId.toString()
         )

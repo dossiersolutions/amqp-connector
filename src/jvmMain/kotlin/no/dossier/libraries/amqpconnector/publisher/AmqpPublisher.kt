@@ -12,7 +12,8 @@ import no.dossier.libraries.amqpconnector.error.AmqpConfigurationError
 import no.dossier.libraries.amqpconnector.error.AmqpPublishingError
 import no.dossier.libraries.amqpconnector.primitives.AmqpExchangeSpec
 import no.dossier.libraries.amqpconnector.primitives.AmqpExchangeType
-import no.dossier.libraries.amqpconnector.primitives.AmqpMessage
+import no.dossier.libraries.amqpconnector.primitives.AmqpOutboundMessage
+import no.dossier.libraries.amqpconnector.primitives.AmqpRoutingKey
 import no.dossier.libraries.functional.*
 import no.dossier.libraries.stl.suspendCancellableCoroutineWithTimeout
 import java.util.concurrent.ConcurrentSkipListMap
@@ -31,7 +32,7 @@ class AmqpPublisher(
 ) {
     private val logger = KotlinLogging.logger { }
 
-    private val outstandingConfirms: ConcurrentSkipListMap<Long, Pair<PublishingContinuation, AmqpMessage<*>>> =
+    private val outstandingConfirms: ConcurrentSkipListMap<Long, Pair<PublishingContinuation, AmqpOutboundMessage<*>>> =
         ConcurrentSkipListMap()
 
     private val amqpChannel: Channel
@@ -67,23 +68,17 @@ class AmqpPublisher(
     }
 
     suspend inline operator fun <reified T: Any> invoke(
-        message: AmqpMessage<T>
+        message: AmqpOutboundMessage<T>
     ): Outcome<AmqpPublishingError, Unit> = publish(message, serializer())
 
-    suspend inline operator fun <reified T: Any> invoke(
-        message: AmqpMessage<T>,
-        routingKey: String
-    ): Outcome<AmqpPublishingError, Unit> = publish(message, serializer(), routingKey)
-
     inline fun <reified T: Any> invokeBlocking(
-        message: AmqpMessage<T>
+        message: AmqpOutboundMessage<T>
     ): Outcome<AmqpPublishingError, Unit> = publishBlocking(message, serializer())
 
     @PublishedApi
     internal fun <T> publishBlocking(
-        message: AmqpMessage<T>,
-        payloadSerializer: KSerializer<T>,
-        routingKey: String = this.routingKey
+        message: AmqpOutboundMessage<T>,
+        payloadSerializer: KSerializer<T>
     ): Outcome<AmqpPublishingError, Unit> =
         if (enableConfirmations) {
             Failure(AmqpPublishingError(
@@ -92,6 +87,8 @@ class AmqpPublisher(
             ))
         }
         else {
+            val routingKey = getActualRoutingKey(message.routingKey)
+
             logger.debug {
                 "← \uD83D\uDCE8 AMQP Publisher - sending message " +
                         "to [${exchangeSpec.name}] using routing key [$routingKey]"
@@ -103,11 +100,11 @@ class AmqpPublisher(
 
     @PublishedApi
     internal suspend fun <T> publish(
-        message: AmqpMessage<T>,
+        message: AmqpOutboundMessage<T>,
         payloadSerializer: KSerializer<T>,
-        routingKey: String = this.routingKey
     ): Outcome<AmqpPublishingError, Unit> = withContext(threadPoolDispatcher) {
         val sequenceNumber = amqpChannel.nextPublishSeqNo
+        val routingKey = getActualRoutingKey(message.routingKey)
 
         logger.debug {
             val sequenceNumberInfo = if (enableConfirmations) "(sequence number [$sequenceNumber]) " else ""
@@ -148,7 +145,7 @@ class AmqpPublisher(
     }
 
     private fun <T> submitMessage(
-        message: AmqpMessage<T>,
+        message: AmqpOutboundMessage<T>,
         payloadSerializer: KSerializer<T>,
         routingKey: String
     ): Outcome<AmqpPublishingError, Unit> =
@@ -169,7 +166,7 @@ class AmqpPublisher(
                 })
             }
 
-    private fun buildProperties(message: AmqpMessage<*>): AMQP.BasicProperties? {
+    private fun buildProperties(message: AmqpOutboundMessage<*>): AMQP.BasicProperties? {
         val amqpPropertiesBuilder = AMQP.BasicProperties().builder()
             .deliveryMode(2 /*persistent*/)
             .headers(message.headers)
@@ -181,7 +178,7 @@ class AmqpPublisher(
     }
 
     private fun <T> serializePayload(
-        message: AmqpMessage<T>,
+        message: AmqpOutboundMessage<T>,
         payloadSerializer: KSerializer<T>
     ) = runCatching({
         AmqpPublishingError(
@@ -240,5 +237,10 @@ class AmqpPublisher(
                     "AMQP Publisher - received $feedbackType for unknown sequenceNumber: [$sequenceNumber]"
                 }
         }
+    }
+
+    private fun getActualRoutingKey(amqpRoutingKey: AmqpRoutingKey) = when(amqpRoutingKey) {
+        is AmqpRoutingKey.Custom -> amqpRoutingKey.key
+        AmqpRoutingKey.PublisherDefault -> routingKey
     }
 }

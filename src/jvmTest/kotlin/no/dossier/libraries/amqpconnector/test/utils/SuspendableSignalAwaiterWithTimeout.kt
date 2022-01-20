@@ -1,6 +1,7 @@
 package no.dossier.libraries.amqpconnector.test.utils
 
 import kotlinx.coroutines.CancellableContinuation
+import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Outcome
 import no.dossier.libraries.stl.suspendCancellableCoroutineWithTimeout
 import kotlin.coroutines.resume
@@ -15,11 +16,12 @@ class SuspendableSignalAwaiterWithTimeout<E, T>(
         continuation.resume(value)
     }
 
-    suspend fun runAndAwaitSignal(block: () -> Unit): Outcome<E, T> =
+    suspend fun runAndAwaitSignal(block: () -> Outcome<E, *>): Outcome<E, T> =
         suspendCancellableCoroutineWithTimeout(timeoutMillis, {
             timeoutError
         }, {
             continuation = it
-            block()
+            val outcome = block()
+            if (outcome is Failure) continuation.resume(outcome)
         })
 }

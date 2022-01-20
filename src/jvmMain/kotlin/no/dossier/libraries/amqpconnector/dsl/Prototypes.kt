@@ -13,7 +13,6 @@ import no.dossier.libraries.amqpconnector.consumer.AmqpConsumer
 import no.dossier.libraries.amqpconnector.consumer.AmqpReplyingMode
 import no.dossier.libraries.amqpconnector.error.AmqpConfigurationError
 import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
-import no.dossier.libraries.amqpconnector.error.AmqpRpcError
 import no.dossier.libraries.amqpconnector.primitives.*
 import no.dossier.libraries.amqpconnector.publisher.AmqpPublisher
 import no.dossier.libraries.amqpconnector.rpc.AmqpRpcClient
@@ -141,7 +140,7 @@ class AmqpConsumerPrototype<T: Any>(
     }
 
     fun <U: Any> build(
-        messageHandler: suspend (AmqpMessage<T>) -> Outcome<AmqpConsumingError, U>,
+        messageHandler: suspend (AmqpInboundMessage<T>) -> Outcome<AmqpConsumingError, U>,
         payloadSerializer: KSerializer<T>,
         replyPayloadSerializer: KSerializer<U>
     ): Outcome<AmqpConfigurationError, AmqpConsumer<T, U>> = attemptBuildResult {

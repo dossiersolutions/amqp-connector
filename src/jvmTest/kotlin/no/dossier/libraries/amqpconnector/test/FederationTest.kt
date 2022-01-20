@@ -5,8 +5,8 @@ import no.dossier.libraries.amqpconnector.connector.PublishingConsumingAmqpConne
 import no.dossier.libraries.amqpconnector.consumer.AmqpReplyingMode
 import no.dossier.libraries.amqpconnector.dsl.*
 import no.dossier.libraries.amqpconnector.primitives.AmqpExchangeType
-import no.dossier.libraries.amqpconnector.primitives.AmqpMessage
-import no.dossier.libraries.amqpconnector.primitives.AmqpMessageProperty
+import no.dossier.libraries.amqpconnector.primitives.AmqpInboundMessage
+import no.dossier.libraries.amqpconnector.primitives.AmqpOutboundMessage
 import no.dossier.libraries.functional.Success
 import no.dossier.libraries.functional.getOrElse
 import org.junit.jupiter.api.*
@@ -48,7 +48,7 @@ class FederationTest {
         val sendMessage = domain1Connector.publisher { exchange { name = "federated.crossdomain" } }
 
         val result = runBlocking {
-            sendMessage(AmqpMessage("hello from domain1"))
+            sendMessage(AmqpOutboundMessage("hello from domain1"))
             waitForConsumer()
         }
 
@@ -60,7 +60,7 @@ class FederationTest {
         val sendMessage = crossdomainConnector.publisher { exchange { name = "federated.domain1" } }
 
         val result = runBlocking {
-            sendMessage(AmqpMessage("hello from crossdomain"))
+            sendMessage(AmqpOutboundMessage("hello from crossdomain"))
             waitForConsumer()
         }
 
@@ -72,7 +72,7 @@ class FederationTest {
         val sendMessage = domain1Connector.publisher { exchange { name = "federated.domain2" } }
 
         val result = runBlocking {
-            sendMessage(AmqpMessage("hello from domain1"))
+            sendMessage(AmqpOutboundMessage("hello from domain1"))
             waitForConsumer()
         }
 
@@ -148,13 +148,13 @@ class FederationTest {
         domain1Connector = connector(role = AmqpConnectorRole.PublisherAndConsumer) {
             connectionString = domain1Container.amqpUrl
 
-            consumer({ message: AmqpMessage<String> -> Success("domain1-rpc-internal: ${message.payload}") }) {
+            consumer({ message: AmqpInboundMessage<String> -> Success("domain1-rpc-internal: ${message.payload}") }) {
                 replyingMode = AmqpReplyingMode.IfRequired
                 messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
                 exchange { name = "domain1.internal" }
             }
 
-            consumer({ message: AmqpMessage<String> ->
+            consumer({ message: AmqpInboundMessage<String> ->
                 resumeWith("domain1: ${message.payload}")
                 Success("domain1-rpc-federated: ${message.payload}")
             }) {
@@ -167,7 +167,7 @@ class FederationTest {
         domain2Connector = connector(role = AmqpConnectorRole.PublisherAndConsumer) {
             connectionString = domain2Container.amqpUrl
 
-            consumer({ message: AmqpMessage<String> ->
+            consumer({ message: AmqpInboundMessage<String> ->
                 Success("domain2-rpc-federated: ${message.payload}")
             }) {
                 replyingMode = AmqpReplyingMode.IfRequired
@@ -175,7 +175,7 @@ class FederationTest {
                 exchange { name = "federated.domain2.rpc" }
             }
 
-            consumer({ message: AmqpMessage<String> ->
+            consumer({ message: AmqpInboundMessage<String> ->
                 resumeWith("domain2: ${message.payload}")
                 Success("domain2-rpc-federated: ${message.payload}")
             }) {
@@ -188,7 +188,7 @@ class FederationTest {
         crossdomainConnector = connector(role = AmqpConnectorRole.PublisherAndConsumer) {
             connectionString = crossdomainContainer.amqpUrl
 
-            consumer({ message: AmqpMessage<String> ->
+            consumer({ message: AmqpInboundMessage<String> ->
                 Success("crossdomain-rpc-federated: ${message.payload}")
             }) {
                 replyingMode = AmqpReplyingMode.IfRequired
@@ -196,7 +196,7 @@ class FederationTest {
                 exchange { name = "federated.crossdomain.rpc" }
             }
 
-            consumer({ message: AmqpMessage<String> ->
+            consumer({ message: AmqpInboundMessage<String> ->
                 resumeWith("crossdomain: ${message.payload}")
                 Success("crossdomain-rpc-federated: ${message.payload}")
             }) {
