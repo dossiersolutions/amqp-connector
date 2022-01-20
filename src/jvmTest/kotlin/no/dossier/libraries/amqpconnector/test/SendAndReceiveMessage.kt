@@ -64,8 +64,8 @@ class SendAndReceiveMessageTest {
         }
     }
 
-    @Container
-    val rabbitMQContainer: RabbitMQContainer = DossierRabbitMqContainer(Network.newNetwork(), "rabbitmq")
+    private val rabbitMQContainer: RabbitMQContainer =
+        DossierRabbitMqContainer(Network.newNetwork(),"rabbitmq")
 
     lateinit var sampleAmqpService: SampleAmqpService
     lateinit var signalAwaiter: SuspendableSignalAwaiterWithTimeout<AmqpError, String>
