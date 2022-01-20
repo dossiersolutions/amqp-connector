@@ -7,7 +7,8 @@ import no.dossier.libraries.amqpconnector.dsl.*
 import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
 import no.dossier.libraries.amqpconnector.primitives.AmqpBindingKey
 import no.dossier.libraries.amqpconnector.primitives.AmqpExchangeType
-import no.dossier.libraries.amqpconnector.primitives.AmqpMessage
+import no.dossier.libraries.amqpconnector.primitives.AmqpInboundMessage
+import no.dossier.libraries.amqpconnector.primitives.AmqpOutboundMessage
 import no.dossier.libraries.amqpconnector.publisher.AmqpPublisher
 import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Outcome
@@ -188,7 +189,7 @@ class ShovelTest {
             declareExchange("domain1-rpc-response")
             addSuspendingConsumer("Domain 2", "crossdomain", "domain2.key")
 
-            consumer({ message: AmqpMessage<String> ->
+            consumer({ message: AmqpInboundMessage<String> ->
                 Success("Domain 2 received: ${message.payload}")
             }) {
                 messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
@@ -206,7 +207,7 @@ class ShovelTest {
             declareExchange("domain1-rpc-response")
             addSuspendingConsumer("Crossdomain", "crossdomain", "crossdomain.key")
 
-            consumer({ message: AmqpMessage<String> ->
+            consumer({ message: AmqpInboundMessage<String> ->
                 Success("Crossdomain received: ${message.payload}")
             }) {
                 messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
@@ -224,7 +225,7 @@ class ShovelTest {
         exchangeName: String,
         bindingKey: String
     ) {
-        consumer({ message: AmqpMessage<String> ->
+        consumer({ message: AmqpInboundMessage<String> ->
             resumeWith("$consumerName received: ${message.payload}")
             Success("Ok")
         }) {
@@ -244,7 +245,9 @@ class ShovelTest {
         exchangeName: String,
         exchangeType: AmqpExchangeType = AmqpExchangeType.TOPIC
     ) {
-        consumer({ _: AmqpMessage<String> -> Failure("Listener not in use") as Outcome<AmqpConsumingError, String> }) {
+        consumer({ _: AmqpInboundMessage<String> ->
+            Failure(AmqpConsumingError("Listener not in use")) as Outcome<AmqpConsumingError, String>
+        }) {
             bindingKey = AmqpBindingKey.Custom("ignore-me")
             messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
             exchange {
@@ -256,7 +259,7 @@ class ShovelTest {
 
     private fun assertMessagesReceivedBy(sendRequest: AmqpPublisher, consumerName: String) {
         runBlocking {
-            sendRequest(AmqpMessage("Some message"))
+            sendRequest(AmqpOutboundMessage("Some message"))
             val result = waitForConsumer()
             assertEquals("$consumerName received: Some message", result)
         }

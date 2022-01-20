@@ -130,7 +130,7 @@ fun <C, S, F: AmqpConnectorFactory<C, S>, P: AmqpConnectorConfigPrototype<S>, R:
  * @Sample no.dossier.libraries.amqpconnector.samples.consumerWithExhaustiveConfiguration
  */
 inline fun <reified T: Any, reified U: Any> ConsumingAmqpConnectorConfigPrototype.consumer(
-    noinline messageHandler: suspend (AmqpMessage<T>) ->  Outcome<AmqpConsumingError, U>,
+    noinline messageHandler: suspend (AmqpInboundMessage<T>) ->  Outcome<AmqpConsumingError, U>,
     builderBlock: AmqpConsumerPrototype<T>.() -> Unit,
 ) {
     val consumer = AmqpConsumerPrototype<T>()

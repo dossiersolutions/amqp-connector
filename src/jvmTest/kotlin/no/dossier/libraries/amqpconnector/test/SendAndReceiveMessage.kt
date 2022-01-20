@@ -8,9 +8,10 @@ import no.dossier.libraries.amqpconnector.dsl.publisher
 import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
 import no.dossier.libraries.amqpconnector.error.AmqpError
 import no.dossier.libraries.amqpconnector.error.AmqpPublishingError
-import no.dossier.libraries.amqpconnector.primitives.AmqpBindingKey
 import no.dossier.libraries.amqpconnector.primitives.AmqpBindingKey.Custom
-import no.dossier.libraries.amqpconnector.primitives.AmqpMessage
+import no.dossier.libraries.amqpconnector.primitives.AmqpInboundMessage
+import no.dossier.libraries.amqpconnector.primitives.AmqpOutboundMessage
+import no.dossier.libraries.amqpconnector.primitives.AmqpRoutingKey
 import no.dossier.libraries.amqpconnector.test.utils.SuspendableSignalAwaiterWithTimeout
 import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Outcome
@@ -21,7 +22,6 @@ import org.testcontainers.containers.Network
 import org.testcontainers.containers.RabbitMQContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
-import org.testcontainers.utility.DockerImageName
 
 @Testcontainers
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -29,18 +29,19 @@ class SendAndReceiveMessageTest {
 
     class SampleAmqpService(
         private val brokerConnectionString: String,
-        private val onMessage: (AmqpMessage<String>) -> Outcome<AmqpConsumingError, Unit>
+        private val onSomeDataMessage: (AmqpInboundMessage<String>) -> Outcome<AmqpConsumingError, Unit>,
+        private val onOtherMessage: (AmqpInboundMessage<String>) -> Outcome<AmqpConsumingError, Unit>
     ) {
         private val connector = connector(role = PublisherAndConsumer) {
             connectionString = brokerConnectionString
 
-            consumer(onMessage) {
+            consumer(onSomeDataMessage) {
                 messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
                 exchange { name = "somedata-exchange" }
                 bindingKey = Custom("somedata.#")
             }
 
-            consumer({ it: AmqpMessage<String> -> onMessage(it.copy(payload = "other: ${it.payload}")) }) {
+            consumer(onOtherMessage) {
                 messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
                 exchange { name = "somedata-exchange" }
                 bindingKey = Custom("other.#")
@@ -53,10 +54,10 @@ class SendAndReceiveMessageTest {
         }
 
         suspend fun sendSamplePublication(request: String): Outcome<AmqpPublishingError, Unit> =
-            publisher(AmqpMessage(request))
+            publisher(AmqpOutboundMessage(request))
 
         suspend fun sendSamplePublication(request: String, routingKey: String): Outcome<AmqpPublishingError, Unit> =
-            publisher(AmqpMessage(request), routingKey)
+            publisher(AmqpOutboundMessage(request, routingKey = AmqpRoutingKey.Custom(routingKey)))
 
         fun shutdown() {
             connector.shutdown()
@@ -80,10 +81,33 @@ class SendAndReceiveMessageTest {
         val connectionString = "amqp://${rabbitMQContainer.adminUsername}:${rabbitMQContainer.adminPassword}" +
                 "@${rabbitMQContainer.containerIpAddress}:${rabbitMQContainer.amqpPort}/"
 
-        sampleAmqpService = SampleAmqpService(connectionString) { message ->
-            signalAwaiter.resume(Success(message.payload))
-            Success(Unit)
-        }
+        sampleAmqpService = SampleAmqpService(
+            brokerConnectionString = connectionString,
+            onSomeDataMessage = { message ->
+                val expectedRoutingKey = "somedata.cool.special"
+                if (message.routingKey == expectedRoutingKey) {
+                    signalAwaiter.resume(Success(message.payload))
+                }
+                else {
+                    signalAwaiter.resume(Failure(AmqpConsumingError(
+                        "Expected routing key: $expectedRoutingKey, but was: ${message.routingKey}"
+                    )))
+                }
+                Success(Unit)
+            },
+            onOtherMessage = { message ->
+                val expectedRoutingKey = "other.data"
+                if (message.routingKey == expectedRoutingKey) {
+                    signalAwaiter.resume(Success("other: ${message.payload}"))
+                }
+                else {
+                    signalAwaiter.resume(Failure(AmqpConsumingError(
+                        "Expected routing key: $expectedRoutingKey, but was: ${message.routingKey}"
+                    )))
+                }
+                Success(Unit)
+            }
+        )
     }
 
     @AfterAll

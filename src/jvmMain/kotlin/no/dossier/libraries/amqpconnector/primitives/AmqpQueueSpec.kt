@@ -6,8 +6,3 @@ data class AmqpQueueSpec(
     val exclusive: Boolean,
     val autoDelete: Boolean,
 )
-
-sealed class AmqpBindingKey {
-    object QueueName: AmqpBindingKey()
-    class Custom(val key: String): AmqpBindingKey()
-}

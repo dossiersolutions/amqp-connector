@@ -8,16 +8,15 @@ import no.dossier.libraries.amqpconnector.consumer.AmqpReplyingMode
 import no.dossier.libraries.amqpconnector.dsl.ConsumingAmqpConnectorConfigPrototype
 import no.dossier.libraries.amqpconnector.dsl.consumer
 import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
-import no.dossier.libraries.amqpconnector.primitives.AmqpBindingKey
 import no.dossier.libraries.amqpconnector.primitives.AmqpBindingKey.Custom
 import no.dossier.libraries.amqpconnector.primitives.AmqpExchangeType
-import no.dossier.libraries.amqpconnector.primitives.AmqpMessage
+import no.dossier.libraries.amqpconnector.primitives.AmqpInboundMessage
 import no.dossier.libraries.amqpconnector.primitives.DeadLetterRoutingKey
 import no.dossier.libraries.functional.Outcome
 import no.dossier.libraries.functional.Success
 
 /* A sample message processing function */
-fun sampleProcessingFunction(message: AmqpMessage<String>): Outcome<AmqpConsumingError, Unit> {
+fun sampleProcessingFunction(message: AmqpInboundMessage<String>): Outcome<AmqpConsumingError, Unit> {
     /*
      * The Outcome indicates whether the processing was successful and the message should be ACKed
      * or not and the message should be rejected. Also, when implementing RPC server, the Success value

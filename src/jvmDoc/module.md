@@ -45,13 +45,13 @@ It relies on the official [RabbitMQ client for Java](https://www.rabbitmq.com/ap
                routingKey = "somedata.cool.special"
            }
     
-           suspend fun sampleProcessingFunction(message: AmqpMessage<String>): Outcome<AmqpConsumingError, Unit> {
+           suspend fun sampleProcessingFunction(message: AmqpInboundMessage<String>): Outcome<AmqpConsumingError, Unit> {
                println(message.payload)
                return Success(Unit)
            }
         
            suspend fun sendSamplePublication(request: String): Outcome<AmqpPublishingError, Unit> =
-               publisher(AmqpMessage(request)) 
+               publisher(AmqpOutboudMessage(request)) 
        }
 ```
 
