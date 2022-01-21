@@ -75,8 +75,7 @@ class AmqpPublisher(
         message: AmqpOutboundMessage<T>
     ): Outcome<AmqpPublishingError, Unit> = publishBlocking(message, serializer())
 
-    @PublishedApi
-    internal fun <T> publishBlocking(
+    fun <T> publishBlocking(
         message: AmqpOutboundMessage<T>,
         payloadSerializer: KSerializer<T>
     ): Outcome<AmqpPublishingError, Unit> =
@@ -98,8 +97,7 @@ class AmqpPublisher(
         }
 
 
-    @PublishedApi
-    internal suspend fun <T> publish(
+    suspend fun <T> publish(
         message: AmqpOutboundMessage<T>,
         payloadSerializer: KSerializer<T>,
     ): Outcome<AmqpPublishingError, Unit> = withContext(threadPoolDispatcher) {
