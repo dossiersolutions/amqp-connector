@@ -210,7 +210,8 @@ class AmqpConsumer<T : Any, U : Any>(
             /* Reply callbacks are dispatched back to the AMQP client consumer thread pool */
             withContext(consumerThreadPoolDispatcher) {
                 logger.debug {
-                    "↩️ \uD83D\uDCE8️ AMQP Consumer - sending reply to $replyTo (correlationId: $correlationId)"
+                    "↩️ \uD83D\uDCE8️ AMQP Consumer - sending reply to exchange: '$replyToExchange'" +
+                            "with routing key: $replyTo (correlationId: $correlationId)"
                 }
 
                 try {
