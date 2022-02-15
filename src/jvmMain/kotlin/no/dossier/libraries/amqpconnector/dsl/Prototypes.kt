@@ -214,7 +214,8 @@ class AmqpPublisherPrototype(
 @AmqpConnectorDsl
 class AmqpRpcClientPrototype<U: Any>(
     var routingKey: String = "",
-    var messageProcessingCoroutineScope: CoroutineScope? = null
+    var messageProcessingCoroutineScope: CoroutineScope? = null,
+    var replyQueueBindingKey: AmqpBindingKey = AmqpBindingKey.QueueName,
 ) {
     private val amqpExchangeSpecPrototype = AmqpExchangeSpecPrototype().apply {
         type = AmqpExchangeType.DEFAULT // overridden default value
@@ -263,6 +264,7 @@ class AmqpRpcClientPrototype<U: Any>(
                 messageProcessingCoroutineScope,
                 exchangeSpec,
                 replyToExchangeSpec,
+                replyQueueBindingKey,
                 routingKey,
                 publishingConnection,
                 consumingConnection,
