@@ -127,7 +127,8 @@ class AmqpRpcClient<U: Any>(
     suspend inline operator fun <reified T: Any> invoke(
         payload: T,
         headers: Map<String, String> = mapOf(),
-        timeoutMillis: Long = 10_000
+        timeoutMillis: Long = 10_000,
+        amqpRoutingKey: AmqpRoutingKey = AmqpRoutingKey.PublisherDefault
     ): Outcome<AmqpRpcError, U> {
         val correlationId = UUID.randomUUID()
 
@@ -141,7 +142,8 @@ class AmqpRpcClient<U: Any>(
             payload,
             refinedHeaders,
             consumerQueueName,
-            correlationId.toString()
+            correlationId.toString(),
+            amqpRoutingKey
         )
 
         return withContext(publisherThreadPoolDispatcher) {
