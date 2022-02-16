@@ -3,10 +3,12 @@ package no.dossier.libraries.amqpconnector.consumer
 import com.rabbitmq.client.AMQP
 import com.rabbitmq.client.Channel
 import com.rabbitmq.client.Connection
+import com.rabbitmq.client.Delivery
 import kotlinx.coroutines.*
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
 import mu.KotlinLogging
+import no.dossier.libraries.amqpconnector.error.AmqpConfigurationError
 import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
 import no.dossier.libraries.amqpconnector.primitives.*
 import no.dossier.libraries.functional.Failure
@@ -26,6 +28,12 @@ class AmqpConsumer<T : Any, U : Any>(
     private val messageProcessingCoroutineScope: CoroutineScope
 ) {
     private val logger = KotlinLogging.logger { }
+
+    private var connection: Connection? = null
+    private var consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher? = null
+    private var tag: String? = null
+    private var amqpChannel: Channel? = null
+    private var actualMainQueueName: String? = null
 
     private val deadLetterRoutingKey = when (deadLetterSpec.routingKey) {
         is DeadLetterRoutingKey.Custom -> deadLetterSpec.routingKey.routingKey
@@ -106,49 +114,89 @@ class AmqpConsumer<T : Any, U : Any>(
     }
 
     fun startConsuming(connection: Connection, consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher): String {
+
+        this.connection = connection
+        this.consumerThreadPoolDispatcher = consumerThreadPoolDispatcher
+
         val amqpChannel = connection.createChannel()
         val actualMainQueueName = createMainExchangesAndQueue(amqpChannel)
         createErrorExchangesAndQueue(amqpChannel, actualMainQueueName)
 
-        amqpChannel.basicConsume(actualMainQueueName, false, { _, delivery ->
-            /* This is executed in the AMQP client consumer thread */
-            logger.debug {
-                "→ \uD83D\uDCE8️ AMQP Consumer - launching message processing coroutine"
-            }
-
-            try {
-                /* But the processing of the message should be dispatched to the workers thread pool */
-                messageProcessingCoroutineScope.launch {
-                    processMessage(AmqpInboundMessage(
-                        headers = delivery.properties.headers?.mapValues { it.value.toString() } ?: emptyMap(),
-                        payload = Json.decodeFromString(serializer, String(delivery.body)),
-                        reply = getReplyCallback(consumerThreadPoolDispatcher, amqpChannel),
-                        acknowledge = getAckOrRejectCallback(
-                            consumerThreadPoolDispatcher,
-                            amqpChannel,
-                            delivery.envelope.deliveryTag,
-                            true
-                        ),
-                        reject = getAckOrRejectCallback(
-                            consumerThreadPoolDispatcher,
-                            amqpChannel,
-                            delivery.envelope.deliveryTag,
-                            false
-                        ),
-                        replyTo = delivery.properties.replyTo,
-                        correlationId = delivery.properties.correlationId,
-                        routingKey = delivery.envelope.routingKey
-                    ))
-                }
-            } catch (e: Exception) {
-                logger.error { "Unable to consume message: ${e.message}" }
-            }
-        }, { _ ->
-            //TODO, cancelling is currently not supported
-        })
+        this.tag = amqpChannel.basicConsume(actualMainQueueName, false,
+            getDeliverCallback(consumerThreadPoolDispatcher, amqpChannel)
+        ) { _ -> }
 
         return actualMainQueueName
     }
+
+    private fun getDeliverCallback(
+        consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher,
+        amqpChannel: Channel
+    ): (consumerTag: String, message: Delivery) -> Unit = { _, delivery ->
+        /* This is executed in the AMQP client consumer thread */
+        logger.debug {
+            "→ \uD83D\uDCE8️ AMQP Consumer - launching message processing coroutine"
+        }
+
+        try {
+            /* But the processing of the message should be dispatched to the workers thread pool */
+            messageProcessingCoroutineScope.launch {
+                processMessage(AmqpInboundMessage(
+                    headers = delivery.properties.headers?.mapValues { it.value.toString() } ?: emptyMap(),
+                    payload = Json.decodeFromString(serializer, String(delivery.body)),
+                    reply = getReplyCallback(consumerThreadPoolDispatcher, amqpChannel),
+                    acknowledge = getAckOrRejectCallback(
+                        consumerThreadPoolDispatcher,
+                        amqpChannel,
+                        delivery.envelope.deliveryTag,
+                        true
+                    ),
+                    reject = getAckOrRejectCallback(
+                        consumerThreadPoolDispatcher,
+                        amqpChannel,
+                        delivery.envelope.deliveryTag,
+                        false
+                    ),
+                    replyTo = delivery.properties.replyTo,
+                    correlationId = delivery.properties.correlationId,
+                    routingKey = delivery.envelope.routingKey
+                ))
+            }
+        } catch (e: Exception) {
+            logger.error { "Unable to consume message: ${e.message}" }
+        }
+    }
+
+    fun pause(): Outcome<AmqpConfigurationError, Unit> =
+        if (connection != null
+            && consumerThreadPoolDispatcher != null
+            && tag != null
+            && amqpChannel != null
+            && actualMainQueueName != null
+        ) {
+            amqpChannel!!.basicCancel(tag)
+            this.tag = null
+            Success(Unit)
+        }
+        else {
+            Failure(AmqpConfigurationError("Unable to pause consumer, it isn't running"))
+        }
+
+    fun unpause(): Outcome<AmqpConfigurationError, Unit> =
+        if (connection != null
+            && consumerThreadPoolDispatcher != null
+            && tag == null
+            && amqpChannel != null
+            && actualMainQueueName != null
+        ) {
+            this.tag = amqpChannel!!.basicConsume(actualMainQueueName, false,
+                getDeliverCallback(consumerThreadPoolDispatcher!!, amqpChannel!!)
+            ) { _ -> }
+            Success(Unit)
+        }
+        else {
+            Failure(AmqpConfigurationError("Unable to unpause consumer, it isn't paused"))
+        }
 
     private suspend fun processMessage(message: AmqpInboundMessage<T>) {
         logger.debug { "Processing message: $message" }

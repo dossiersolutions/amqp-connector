@@ -28,7 +28,7 @@ class AmqpRpcClient<U: Any>(
     @PublishedApi
     internal  val replyToExchangeSpec: AmqpExchangeSpec,
     @PublishedApi
-    internal  val replyQueueBindingKey: AmqpBindingKey, //If ReplyToExchange is
+    internal  val replyQueueBindingKey: AmqpBindingKey,
     private val routingKey: String,
     private val publishingConnection: Connection,
     private val consumingConnection: Connection,
