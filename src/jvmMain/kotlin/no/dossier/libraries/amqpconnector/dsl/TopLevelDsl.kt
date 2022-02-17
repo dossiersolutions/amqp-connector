@@ -5,6 +5,7 @@ package no.dossier.libraries.amqpconnector.dsl
 import kotlinx.serialization.serializer
 import no.dossier.libraries.amqpconnector.connector.*
 import no.dossier.libraries.amqpconnector.consumer.AmqpConsumer
+import no.dossier.libraries.amqpconnector.error.AmqpConfigurationError
 import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
 import no.dossier.libraries.amqpconnector.primitives.*
 import no.dossier.libraries.amqpconnector.publisher.AmqpPublisher
@@ -132,11 +133,12 @@ fun <C, S, F: AmqpConnectorFactory<C, S>, P: AmqpConnectorConfigPrototype<S>, R:
 inline fun <reified T: Any, reified U: Any> ConsumingAmqpConnectorConfigPrototype.consumer(
     noinline messageHandler: suspend (AmqpInboundMessage<T>) ->  Outcome<AmqpConsumingError, U>,
     builderBlock: AmqpConsumerPrototype<T>.() -> Unit,
-) {
+): Outcome<AmqpConfigurationError, AmqpConsumer<T, U>> {
     val consumer = AmqpConsumerPrototype<T>()
         .apply(builderBlock).build(messageHandler, serializer(), serializer())
 
     consumerBuilderOutcomes += consumer
+    return consumer
 }
 
 /**
