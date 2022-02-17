@@ -9,6 +9,7 @@ import no.dossier.libraries.amqpconnector.dsl.AmqpConnectorRole.*
 import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
 import no.dossier.libraries.amqpconnector.error.AmqpRpcError
 import no.dossier.libraries.amqpconnector.primitives.AmqpInboundMessage
+import no.dossier.libraries.amqpconnector.primitives.AmqpOutboundMessage
 import no.dossier.libraries.functional.Outcome
 import no.dossier.libraries.functional.Success
 
@@ -57,7 +58,7 @@ fun basicPublishingConnectorInitialization() {
 
         /* Note that publisher invocation must be done from coroutine scope therefore this is suspending function */
         suspend fun sendSampleMessage(msg: String) {
-            samplePublisher(AmqpInboundMessage(msg))
+            samplePublisher(AmqpOutboundMessage(msg))
         }
     }
 }
@@ -75,7 +76,7 @@ fun basicPublishingAndConsumingConnectorInitialization() {
         }
 
         /* Note that publisher invocation must be done from coroutine scope therefore this is suspending function */
-        suspend fun sendSampleMessage(msg: String): Outcome<AmqpRpcError, String> = sampleRpcClient(AmqpInboundMessage(msg))
+        suspend fun sendSampleMessage(msg: String): Outcome<AmqpRpcError, String> = sampleRpcClient(AmqpOutboundMessage(msg))
     }
 }
 
@@ -144,7 +145,7 @@ fun basicSpringIntegration() {
             /* Reminder of RPC client setup here */
         }
 
-        suspend fun sendSampleMessage(msg: String): Outcome<AmqpRpcError, String> = sampleRpcClient(AmqpInboundMessage(msg))
+        suspend fun sendSampleMessage(msg: String): Outcome<AmqpRpcError, String> = sampleRpcClient(AmqpOutboundMessage(msg))
     }
 
     /*

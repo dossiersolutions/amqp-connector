@@ -123,6 +123,8 @@ fun <C, S, F: AmqpConnectorFactory<C, S>, P: AmqpConnectorConfigPrototype<S>, R:
  * which is supposed to process the incoming messages
  * @param builderBlock A contextual lambda applied to [AmqpConsumerPrototype]
  * in order to configure the consumer.
+ * @return An instance of [AmqpConsumer]
+ * @throws RuntimeException if the consumer cannot be instantiated
  *
  * @see AmqpConsumer
  * @see AmqpConsumerPrototype
@@ -133,12 +135,12 @@ fun <C, S, F: AmqpConnectorFactory<C, S>, P: AmqpConnectorConfigPrototype<S>, R:
 inline fun <reified T: Any, reified U: Any> ConsumingAmqpConnectorConfigPrototype.consumer(
     noinline messageHandler: suspend (AmqpInboundMessage<T>) ->  Outcome<AmqpConsumingError, U>,
     builderBlock: AmqpConsumerPrototype<T>.() -> Unit,
-): Outcome<AmqpConfigurationError, AmqpConsumer<T, U>> {
+): AmqpConsumer<T, U> {
     val consumer = AmqpConsumerPrototype<T>()
         .apply(builderBlock).build(messageHandler, serializer(), serializer())
 
     consumerBuilderOutcomes += consumer
-    return consumer
+    return consumer.forceGet()
 }
 
 /**
@@ -150,6 +152,8 @@ inline fun <reified T: Any, reified U: Any> ConsumingAmqpConnectorConfigPrototyp
  *
  * @param builderBlock A contextual lambda applied to [AmqpPublisherPrototype]
  * in order to configure the consumer.
+ * @return An instance of [AmqpPublisher]
+ * @throws RuntimeException if the publisher cannot be instantiated
  *
  * @see AmqpPublisher
  * @see AmqpPublisherPrototype
@@ -176,6 +180,8 @@ fun PublishingAmqpConnector.publisher(
  * @param U Type of response payload (note that the request payload is bound only on invocation of the RPC client)
  * @param builderBlock A contextual lambda applied to [AmqpRpcClientPrototype]
  * in order to configure the consumer.
+ * @return An instance of [AmqpRpcClient]
+ * @throws RuntimeException if the RPC client cannot be instantiated
  *
  * @see AmqpRpcClient
  * @see AmqpRpcClientPrototype

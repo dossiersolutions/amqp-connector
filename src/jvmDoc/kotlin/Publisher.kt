@@ -10,6 +10,7 @@ import no.dossier.libraries.amqpconnector.dsl.publisher
 import no.dossier.libraries.amqpconnector.error.AmqpPublishingError
 import no.dossier.libraries.amqpconnector.primitives.AmqpExchangeType
 import no.dossier.libraries.amqpconnector.primitives.AmqpInboundMessage
+import no.dossier.libraries.amqpconnector.primitives.AmqpOutboundMessage
 import no.dossier.libraries.functional.Outcome
 
 fun samplePublisherPublishingToSpecificQueueWithoutConfirmations() {
@@ -79,7 +80,7 @@ fun sampleSendMethod() {
      * class serializable by kotlinx.serialization (SampleRequest in this case)
      */
     suspend fun sendTestPublication(request: SampleRequest): Outcome<AmqpPublishingError, Unit> =
-        testPublisher(AmqpInboundMessage(request))
+        testPublisher(AmqpOutboundMessage(request))
 }
 
 fun sampleSendLotOfMessages() {
