@@ -93,7 +93,8 @@ class AmqpConsumer<T : Any, U : Any>(
                 queueDeclare(
                     errorQueueName,
                     queueSpec.durable,
-                    queueSpec.exclusive,
+                    // we don't want to make the error queues exclusive so that ops can manipulate with the messages
+                    false,
                     queueSpec.autoDelete,
                     null
                 )
@@ -236,7 +237,10 @@ class AmqpConsumer<T : Any, U : Any>(
                 message.acknowledge()
             }
             is Failure -> {
-                logger.debug { "Message processing finished with Failure, dispatching REJECT" }
+                logger.warn {
+                    "Message processing finished with Failure, dispatching REJECT\n" +
+                    result.error.toString()
+                }
                 message.reject()
             }
         }
