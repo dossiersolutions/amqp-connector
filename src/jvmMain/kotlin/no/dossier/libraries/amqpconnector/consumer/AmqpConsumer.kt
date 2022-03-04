@@ -143,7 +143,7 @@ class AmqpConsumer<T : Any, U : Any>(
             messageProcessingCoroutineScope.launch {
                 processMessage(AmqpInboundMessage(
                     headers = delivery.properties.headers?.mapValues { it.value.toString() } ?: emptyMap(),
-                    payload = amqpJsonConfig.decodeFromString(serializer, String(delivery.body)),
+                    rawPayload = delivery.body,
                     reply = getReplyCallback(consumerThreadPoolDispatcher, amqpChannel),
                     acknowledge = getAckOrRejectCallback(
                         consumerThreadPoolDispatcher,
@@ -159,7 +159,8 @@ class AmqpConsumer<T : Any, U : Any>(
                     ),
                     replyTo = delivery.properties.replyTo,
                     correlationId = delivery.properties.correlationId,
-                    routingKey = delivery.envelope.routingKey
+                    routingKey = delivery.envelope.routingKey,
+                    serializer = serializer
                 ))
             }
         } catch (e: Exception) {

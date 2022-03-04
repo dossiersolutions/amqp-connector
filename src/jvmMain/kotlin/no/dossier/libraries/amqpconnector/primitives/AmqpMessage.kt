@@ -1,5 +1,7 @@
 package no.dossier.libraries.amqpconnector.primitives
 
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.json.Json
 import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
 import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Outcome
@@ -13,7 +15,7 @@ enum class AmqpMessageProperty {
 }
 
 data class AmqpInboundMessage<T>(
-    val payload: T,
+    val rawPayload: ByteArray,
     val headers: Map<String, String> = mapOf(),
     val reply: suspend (
         serializedPayload: String,
@@ -25,12 +27,48 @@ data class AmqpInboundMessage<T>(
     val reject: suspend () -> Unit = { },
     val replyTo: String? = null,
     val correlationId: String? = null,
-    val routingKey: String
+    val routingKey: String,
+    private val serializer: KSerializer<T>
 ) {
+    val payload: T by lazy { Json.decodeFromString(serializer, String(rawPayload)) }
+
     operator fun get(key: AmqpMessageProperty): Outcome<AmqpConsumingError, String> =
         headers[key.name]
             ?.let { Success(it) }
             ?: Failure(AmqpConsumingError("Message doesn't contain property: ${key.name}"))
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as AmqpInboundMessage<*>
+
+        if (!rawPayload.contentEquals(other.rawPayload)) return false
+        if (headers != other.headers) return false
+        if (reply != other.reply) return false
+        if (acknowledge != other.acknowledge) return false
+        if (reject != other.reject) return false
+        if (replyTo != other.replyTo) return false
+        if (correlationId != other.correlationId) return false
+        if (routingKey != other.routingKey) return false
+        if (serializer != other.serializer) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = rawPayload.contentHashCode()
+        result = 31 * result + headers.hashCode()
+        result = 31 * result + reply.hashCode()
+        result = 31 * result + acknowledge.hashCode()
+        result = 31 * result + reject.hashCode()
+        result = 31 * result + (replyTo?.hashCode() ?: 0)
+        result = 31 * result + (correlationId?.hashCode() ?: 0)
+        result = 31 * result + routingKey.hashCode()
+        result = 31 * result + serializer.hashCode()
+        return result
+    }
+
 }
 
 data class AmqpOutboundMessage<T>(
