@@ -6,7 +6,6 @@ import com.rabbitmq.client.Connection
 import com.rabbitmq.client.Delivery
 import kotlinx.coroutines.*
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.json.Json
 import mu.KotlinLogging
 import no.dossier.libraries.amqpconnector.error.AmqpConfigurationError
 import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
@@ -144,7 +143,7 @@ class AmqpConsumer<T : Any, U : Any>(
             messageProcessingCoroutineScope.launch {
                 processMessage(AmqpInboundMessage(
                     headers = delivery.properties.headers?.mapValues { it.value.toString() } ?: emptyMap(),
-                    payload = Json.decodeFromString(serializer, String(delivery.body)),
+                    payload = amqpJsonConfig.decodeFromString(serializer, String(delivery.body)),
                     reply = getReplyCallback(consumerThreadPoolDispatcher, amqpChannel),
                     acknowledge = getAckOrRejectCallback(
                         consumerThreadPoolDispatcher,
@@ -220,7 +219,7 @@ class AmqpConsumer<T : Any, U : Any>(
                     AmqpReplyingMode.Always,
                     AmqpReplyingMode.IfRequired -> if (messageHasReplyPropertiesSet) {
                         try {
-                            val payload = Json.encodeToString(replyPayloadSerializer, result.value)
+                            val payload = amqpJsonConfig.encodeToString(replyPayloadSerializer, result.value)
                             logger.debug { "Message processing finished with Success, dispatching REPLY" }
                             val replyToExchange = message.headers[AmqpMessageProperty.REPLY_TO_EXCHANGE.name] ?: ""
                             message.reply(payload, message.replyTo!!, message.correlationId!!, replyToExchange)

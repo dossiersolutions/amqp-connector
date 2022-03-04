@@ -5,15 +5,11 @@ import com.rabbitmq.client.Channel
 import com.rabbitmq.client.Connection
 import kotlinx.coroutines.*
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import mu.KotlinLogging
 import no.dossier.libraries.amqpconnector.error.AmqpConfigurationError
 import no.dossier.libraries.amqpconnector.error.AmqpPublishingError
-import no.dossier.libraries.amqpconnector.primitives.AmqpExchangeSpec
-import no.dossier.libraries.amqpconnector.primitives.AmqpExchangeType
-import no.dossier.libraries.amqpconnector.primitives.AmqpOutboundMessage
-import no.dossier.libraries.amqpconnector.primitives.AmqpRoutingKey
+import no.dossier.libraries.amqpconnector.primitives.*
 import no.dossier.libraries.functional.*
 import no.dossier.libraries.stl.suspendCancellableCoroutineWithTimeout
 import java.util.concurrent.ConcurrentSkipListMap
@@ -184,7 +180,7 @@ class AmqpPublisher(
             amqpMessage = message
         )
     }, {
-        Json.encodeToString(payloadSerializer, message.payload)
+        amqpJsonConfig.encodeToString(payloadSerializer, message.payload)
     })
 
     private fun getSubmissionFeedbackHandler(
