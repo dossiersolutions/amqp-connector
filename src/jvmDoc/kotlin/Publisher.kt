@@ -58,6 +58,9 @@ fun samplePublisherWithExhaustiveConfiguration() {
         }
         routingKey = "somedata.cool.special" // Default: ""
         confirmations = true // Default: true
+        onMessagePublished = { message, actualRoutingKey ->
+            //log message and routing key
+        } // Default: { _, _ -> }
     }
 }
 

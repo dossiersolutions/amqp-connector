@@ -4,8 +4,6 @@ import com.rabbitmq.client.AMQP
 import com.rabbitmq.client.Channel
 import com.rabbitmq.client.Connection
 import kotlinx.coroutines.*
-import kotlinx.serialization.KSerializer
-import kotlinx.serialization.serializer
 import mu.KotlinLogging
 import no.dossier.libraries.amqpconnector.error.AmqpConfigurationError
 import no.dossier.libraries.amqpconnector.error.AmqpPublishingError
@@ -13,7 +11,6 @@ import no.dossier.libraries.amqpconnector.primitives.*
 import no.dossier.libraries.functional.*
 import no.dossier.libraries.stl.suspendCancellableCoroutineWithTimeout
 import java.util.concurrent.ConcurrentSkipListMap
-import java.util.concurrent.Executors
 import kotlin.coroutines.resume
 
 typealias PublishingContinuation = CancellableContinuation<Outcome<AmqpPublishingError, Unit>>
@@ -23,8 +20,8 @@ class AmqpPublisher(
     private val routingKey: String,
     private val enableConfirmations: Boolean,
     publishingConnection: Connection,
-    private val threadPoolDispatcher: ExecutorCoroutineDispatcher =
-        Executors.newFixedThreadPool(1).asCoroutineDispatcher()
+    private val threadPoolDispatcher: ExecutorCoroutineDispatcher,
+    private val onMessagePublished: (message: AmqpOutboundMessage<*>, actualRoutingKey: String) -> Unit
 ) {
     private val logger = KotlinLogging.logger { }
 
@@ -63,17 +60,8 @@ class AmqpPublisher(
         }
     }
 
-    suspend inline operator fun <reified T: Any> invoke(
+    fun <T: Any> invokeBlocking(
         message: AmqpOutboundMessage<T>
-    ): Outcome<AmqpPublishingError, Unit> = publish(message, serializer())
-
-    inline fun <reified T: Any> invokeBlocking(
-        message: AmqpOutboundMessage<T>
-    ): Outcome<AmqpPublishingError, Unit> = publishBlocking(message, serializer())
-
-    fun <T> publishBlocking(
-        message: AmqpOutboundMessage<T>,
-        payloadSerializer: KSerializer<T>
     ): Outcome<AmqpPublishingError, Unit> =
         if (enableConfirmations) {
             Failure(AmqpPublishingError(
@@ -89,22 +77,21 @@ class AmqpPublisher(
                         "to [${exchangeSpec.name}] using routing key [$routingKey]"
             }
 
-            submitMessage(message, payloadSerializer, routingKey)
+            submitMessage(message, routingKey)
         }
 
 
-    suspend fun <T> publish(
-        message: AmqpOutboundMessage<T>,
-        payloadSerializer: KSerializer<T>,
+    suspend operator fun <T: Any> invoke(
+        message: AmqpOutboundMessage<T>
     ): Outcome<AmqpPublishingError, Unit> = withContext(threadPoolDispatcher) {
         val sequenceNumber = amqpChannel.nextPublishSeqNo
-        val routingKey = getActualRoutingKey(message.routingKey)
+        val actualRoutingKey = getActualRoutingKey(message.routingKey)
 
         logger.debug {
             val sequenceNumberInfo = if (enableConfirmations) "(sequence number [$sequenceNumber]) " else ""
 
             "← \uD83D\uDCE8 AMQP Publisher - sending message $sequenceNumberInfo" +
-                    "to [${exchangeSpec.name}] using routing key [$routingKey]"
+                    "to [${exchangeSpec.name}] using routing key [$actualRoutingKey]"
         }
 
         if (enableConfirmations) {
@@ -124,7 +111,7 @@ class AmqpPublisher(
                      * we wouldn't be able to resume the execution.
                      */
                     outstandingConfirms[sequenceNumber] = continuation to message
-                    val result = submitMessage(message, payloadSerializer, routingKey)
+                    val result = submitMessage(message, actualRoutingKey)
 
                     /* If the submission fails we want to resume right away */
                     if (result is Failure) {
@@ -134,16 +121,19 @@ class AmqpPublisher(
                 }
             )
         } else {
-            submitMessage(message, payloadSerializer, routingKey)
+            val result = submitMessage(message, actualRoutingKey)
+            if (result is Success) {
+                onMessagePublished(message, actualRoutingKey)
+            }
+            result
         }
     }
 
     private fun <T> submitMessage(
         message: AmqpOutboundMessage<T>,
-        payloadSerializer: KSerializer<T>,
         routingKey: String
     ): Outcome<AmqpPublishingError, Unit> =
-        serializePayload(message, payloadSerializer)
+        serializePayload(message)
             .andThen { serializedPayload ->
                 runCatching({
                     AmqpPublishingError(
@@ -155,7 +145,7 @@ class AmqpPublisher(
                         exchangeSpec.name,
                         routingKey,
                         buildProperties(message),
-                        serializedPayload.toByteArray()
+                        serializedPayload
                     )
                 })
             }
@@ -172,15 +162,14 @@ class AmqpPublisher(
     }
 
     private fun <T> serializePayload(
-        message: AmqpOutboundMessage<T>,
-        payloadSerializer: KSerializer<T>
+        message: AmqpOutboundMessage<T>
     ) = runCatching({
         AmqpPublishingError(
             message = "Unable to serialize payload: ${it.message}",
             amqpMessage = message
         )
     }, {
-        amqpJsonConfig.encodeToString(payloadSerializer, message.payload)
+        message.rawPayload
     })
 
     private fun getSubmissionFeedbackHandler(
@@ -198,8 +187,10 @@ class AmqpPublisher(
             val sequenceNumbers = confirmed.keys.joinToString(",")
             if (confirmed.isNotEmpty()) {
                 confirmed.values.forEach { (continuation, message) ->
-                    if (positive)
+                    if (positive) {
                         continuation.resume(Success(Unit))
+                        onMessagePublished(message, getActualRoutingKey(message.routingKey))
+                    }
                     else
                         continuation.resume(Failure(AmqpPublishingError(
                             message = "Messages with sequence numbers [$sequenceNumbers] were rejected by the broker",
@@ -215,8 +206,10 @@ class AmqpPublisher(
         } else {
             outstandingConfirms[sequenceNumber]
                 ?.also { (continuation, message) ->
-                    if (positive)
+                    if (positive) {
                         continuation.resume(Success(Unit))
+                        onMessagePublished(message, getActualRoutingKey(message.routingKey))
+                    }
                     else
                         continuation.resume(
                             Failure(AmqpPublishingError(

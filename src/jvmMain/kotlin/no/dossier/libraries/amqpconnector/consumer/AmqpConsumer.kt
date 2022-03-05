@@ -24,7 +24,10 @@ class AmqpConsumer<T : Any, U : Any>(
     private val queueSpec: AmqpQueueSpec,
     private val deadLetterSpec: AmqpDeadLetterSpec,
     private val replyingMode: AmqpReplyingMode,
-    private val messageProcessingCoroutineScope: CoroutineScope
+    private val messageProcessingCoroutineScope: CoroutineScope,
+    private val onMessageConsumed: (message: AmqpInboundMessage<T>) -> Unit,
+    private val onMessageRejected: (message: AmqpInboundMessage<T>) -> Unit,
+    private val onMessageReplyPublished: (message: AmqpOutboundMessage<*>) -> Unit,
 ) {
     private val logger = KotlinLogging.logger { }
 
@@ -220,10 +223,17 @@ class AmqpConsumer<T : Any, U : Any>(
                     AmqpReplyingMode.Always,
                     AmqpReplyingMode.IfRequired -> if (messageHasReplyPropertiesSet) {
                         try {
-                            val payload = amqpJsonConfig.encodeToString(replyPayloadSerializer, result.value)
                             logger.debug { "Message processing finished with Success, dispatching REPLY" }
                             val replyToExchange = message.headers[AmqpMessageProperty.REPLY_TO_EXCHANGE.name] ?: ""
-                            message.reply(payload, message.replyTo!!, message.correlationId!!, replyToExchange)
+                            val reply = AmqpOutboundMessage(
+                                payload = result.value,
+                                headers = emptyMap(),
+                                replyTo = null,
+                                correlationId =  message.correlationId!!,
+                                routingKey = AmqpRoutingKey.Custom(message.replyTo!!),
+                                serializer = replyPayloadSerializer
+                            )
+                            message.reply(reply, replyToExchange)
                         } catch (e: Exception) {
                             logger.debug { "Unable to send reply message ${e.message}" }
                         }
@@ -235,6 +245,7 @@ class AmqpConsumer<T : Any, U : Any>(
                     }
                 }
                 message.acknowledge()
+                onMessageConsumed(message)
             }
             is Failure -> {
                 logger.warn {
@@ -242,6 +253,7 @@ class AmqpConsumer<T : Any, U : Any>(
                     result.error.toString()
                 }
                 message.reject()
+                onMessageRejected(message)
             }
         }
     }
@@ -257,23 +269,27 @@ class AmqpConsumer<T : Any, U : Any>(
     private fun getReplyCallback(
         consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher,
         amqpChannel: Channel
-    ): suspend (serializedPayload: String, replyTo: String, correlationId: String, replyToExchange: String) -> Unit =
-        { serializedPayload, replyTo, correlationId, replyToExchange ->
+    ): suspend (message: AmqpOutboundMessage<*>, replyToExchange: String) -> Unit =
+        { message, replyToExchange ->
             /* Reply callbacks are dispatched back to the AMQP client consumer thread pool */
             withContext(consumerThreadPoolDispatcher) {
+                val routingKey = (message.routingKey as AmqpRoutingKey.Custom).key
+
                 logger.debug {
                     "↩️ \uD83D\uDCE8️ AMQP Consumer - sending reply to exchange: '$replyToExchange'" +
-                            "with routing key: $replyTo (correlationId: $correlationId)"
+                            "with routing key: $routingKey (correlationId: ${message.correlationId})"
                 }
 
                 try {
                     val replyProperties = AMQP.BasicProperties().builder()
-                        .correlationId(correlationId)
+                        .correlationId(message.correlationId)
                         .deliveryMode(2 /*persistent*/)
                         .build()
 
+                    // This is executed in the consumerThreadPool, so it is fine that it will block
                     @Suppress("BlockingMethodInNonBlockingContext")
-                    amqpChannel.basicPublish(replyToExchange, replyTo, replyProperties, serializedPayload.toByteArray())
+                    amqpChannel.basicPublish(replyToExchange, routingKey, replyProperties, message.rawPayload)
+                    onMessageReplyPublished(message)
                 } catch (e: IOException) {
                     logger.debug { "AMQP Consumer - failed to send reply" }
                 }
@@ -292,6 +308,7 @@ class AmqpConsumer<T : Any, U : Any>(
             logger.debug { "AMQP Consumer - sending $operationName" }
 
             try {
+                // This is executed in the consumerThreadPool, so it is fine that it will block
                 @Suppress("BlockingMethodInNonBlockingContext")
                 if (acknowledge) {
                     amqpChannel.basicAck(deliveryTag, false)

@@ -1,4 +1,4 @@
-package no.dossier.libraries.amqpconnector.primitives
+package no.dossier.libraries.amqpconnector.serialization
 
 import kotlinx.serialization.json.Json
 

@@ -96,5 +96,14 @@ fun ConsumingAmqpConnectorConfigPrototype.consumerWithExhaustiveConfiguration() 
                 name = "some-ref-data-error-queue" // Default: AmqpExchangeType.TOPIC
             }
         }
+        onMessageConsumed = { message ->
+            //log message
+        } // Default: { _ -> }
+        onMessageRejected = { message ->
+            //log message
+        } // Default: { _ -> }
+        onMessageReplyPublished = { message ->
+            //log message
+        } // Default: { _ -> }
     }
 }

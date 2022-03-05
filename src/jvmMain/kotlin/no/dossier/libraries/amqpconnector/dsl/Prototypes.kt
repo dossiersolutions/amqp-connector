@@ -5,6 +5,7 @@ package no.dossier.libraries.amqpconnector.dsl
 import com.rabbitmq.client.Connection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.serialization.KSerializer
 import no.dossier.libraries.amqpconnector.connector.AmqpConnectorConfig
 import no.dossier.libraries.amqpconnector.connector.ConsumingAmqpConnectorConfig
@@ -18,6 +19,7 @@ import no.dossier.libraries.amqpconnector.publisher.AmqpPublisher
 import no.dossier.libraries.amqpconnector.rpc.AmqpRpcClient
 import no.dossier.libraries.functional.*
 import no.dossier.libraries.stl.getValidatedUri
+import java.util.concurrent.Executors
 
 /**
  * This annotation will prevent polluting local DSL contexts with properties and functions from
@@ -121,7 +123,10 @@ class AmqpDeadLetterSpecPrototype(
 class AmqpConsumerPrototype<T: Any>(
     var bindingKey: AmqpBindingKey = AmqpBindingKey.Custom("#"),
     var replyingMode: AmqpReplyingMode = AmqpReplyingMode.Never,
-    var messageProcessingCoroutineScope: CoroutineScope? = null
+    var messageProcessingCoroutineScope: CoroutineScope? = null,
+    var onMessageConsumed: (message: AmqpInboundMessage<T>) -> Unit = { _ -> },
+    var onMessageRejected: (message: AmqpInboundMessage<T>) -> Unit = { _ -> },
+    var onMessageReplyPublished: (message: AmqpOutboundMessage<*>) -> Unit = { _ -> }
 ) {
     private val amqpExchangeSpecPrototype = AmqpExchangeSpecPrototype()
     private val amqpQueueSpecPrototype = AmqpQueueSpecPrototype()
@@ -163,7 +168,10 @@ class AmqpConsumerPrototype<T: Any>(
                 queueSpec,
                 deadLetterSpec,
                 replyingMode,
-                messageProcessingCoroutineScope
+                messageProcessingCoroutineScope,
+                onMessageConsumed,
+                onMessageRejected,
+                onMessageReplyPublished
             )
         )
     }
@@ -187,6 +195,7 @@ class AmqpExchangeSpecPrototype(
 class AmqpPublisherPrototype(
     var routingKey: String = "",
     var confirmations: Boolean = true,
+    var onMessagePublished: (message: AmqpOutboundMessage<*>, actualRoutingKey: String) -> Unit = { _, _ -> }
 ) {
     private val amqpExchangeSpecPrototype = AmqpExchangeSpecPrototype()
 
@@ -206,6 +215,8 @@ class AmqpPublisherPrototype(
                 routingKey,
                 confirmations,
                 connection,
+                Executors.newFixedThreadPool(1).asCoroutineDispatcher(),
+                onMessagePublished
             )
         )
     }
@@ -216,6 +227,9 @@ class AmqpRpcClientPrototype<U: Any>(
     var routingKey: String = "",
     var messageProcessingCoroutineScope: CoroutineScope? = null,
     var replyQueueBindingKey: AmqpBindingKey = AmqpBindingKey.QueueName,
+    var onReplyConsumed: (message: AmqpInboundMessage<U>) -> Unit = { _ -> },
+    var onReplyRejected: (message: AmqpInboundMessage<U>) -> Unit = { _ -> },
+    var onRequestPublished: (message: AmqpOutboundMessage<*>, actualRoutingKey: String) -> Unit = { _, _ -> }
 ) {
     private val amqpExchangeSpecPrototype = AmqpExchangeSpecPrototype().apply {
         type = AmqpExchangeType.DEFAULT // overridden default value
@@ -268,7 +282,10 @@ class AmqpRpcClientPrototype<U: Any>(
                 routingKey,
                 publishingConnection,
                 consumingConnection,
-                consumerThreadPoolDispatcher
+                consumerThreadPoolDispatcher,
+                onReplyConsumed,
+                onReplyRejected,
+                onRequestPublished
             )
         )
     }

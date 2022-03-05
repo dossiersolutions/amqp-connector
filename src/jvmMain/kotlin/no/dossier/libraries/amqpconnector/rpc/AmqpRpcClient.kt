@@ -32,7 +32,10 @@ class AmqpRpcClient<U: Any>(
     private val routingKey: String,
     private val publishingConnection: Connection,
     private val consumingConnection: Connection,
-    private val consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher
+    private val consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher,
+    private val onReplyConsumed: (message: AmqpInboundMessage<U>) -> Unit,
+    private val onReplyRejected: (message: AmqpInboundMessage<U>) -> Unit,
+    private val onRequestPublished: (message: AmqpOutboundMessage<*>, actualRoutingKey: String) -> Unit
 ) {
     @PublishedApi
     internal val logger = KotlinLogging.logger { }
@@ -111,7 +114,10 @@ class AmqpRpcClient<U: Any>(
             queueSpec,
             deadLetterSpec,
             AmqpReplyingMode.Never,
-            messageProcessingCoroutineScope
+            messageProcessingCoroutineScope,
+            onReplyConsumed,
+            onReplyRejected,
+            onMessageReplyPublished = {}
         )
 
         publisher = AmqpPublisher(
@@ -119,7 +125,8 @@ class AmqpRpcClient<U: Any>(
             routingKey,
             false,
             publishingConnection,
-            publisherThreadPoolDispatcher
+            publisherThreadPoolDispatcher,
+            onRequestPublished
         )
 
         consumerQueueName = consumer.startConsuming(consumingConnection, consumerThreadPoolDispatcher)

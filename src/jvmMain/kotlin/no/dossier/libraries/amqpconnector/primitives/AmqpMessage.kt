@@ -2,7 +2,9 @@ package no.dossier.libraries.amqpconnector.primitives
 
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.serializer
 import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
+import no.dossier.libraries.amqpconnector.serialization.amqpJsonConfig
 import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Outcome
 import no.dossier.libraries.functional.Success
@@ -18,11 +20,9 @@ data class AmqpInboundMessage<T>(
     val rawPayload: ByteArray,
     val headers: Map<String, String> = mapOf(),
     val reply: suspend (
-        serializedPayload: String,
-        replyTo: String,
-        correlationId: String,
+        message: AmqpOutboundMessage<*>,
         replyToExchange: String
-    ) -> Unit = { _, _, _, _ ->  },
+    ) -> Unit = { _, _ ->  },
     val acknowledge: suspend () -> Unit = { },
     val reject: suspend () -> Unit = { },
     val replyTo: String? = null,
@@ -30,7 +30,7 @@ data class AmqpInboundMessage<T>(
     val routingKey: String,
     private val serializer: KSerializer<T>
 ) {
-    val payload: T by lazy { Json.decodeFromString(serializer, String(rawPayload)) }
+    val payload: T by lazy { amqpJsonConfig.decodeFromString(serializer, String(rawPayload)) }
 
     operator fun get(key: AmqpMessageProperty): Outcome<AmqpConsumingError, String> =
         headers[key.name]
@@ -71,13 +71,32 @@ data class AmqpInboundMessage<T>(
 
 }
 
+/*
+* We need this inline factory method because inline constructors are not yet supported in Kotlin
+* see https://youtrack.jetbrains.com/issue/KT-30915
+*/
+@Suppress("FunctionName")
+inline fun <reified T> AmqpOutboundMessage(
+    payload: T,
+    headers: Map<String, String> = mapOf(),
+    replyTo: String? = null,
+    correlationId: String? = null,
+    routingKey: AmqpRoutingKey = AmqpRoutingKey.PublisherDefault,
+): AmqpOutboundMessage<T> = AmqpOutboundMessage(
+    payload, headers, replyTo, correlationId, routingKey, serializer()
+)
+
 data class AmqpOutboundMessage<T>(
     val payload: T,
-    val headers: Map<String, String> = mapOf(),
-    val replyTo: String? = null,
-    val correlationId: String? = null,
-    val routingKey: AmqpRoutingKey = AmqpRoutingKey.PublisherDefault
+    val headers: Map<String, String>,
+    val replyTo: String?,
+    val correlationId: String?,
+    val routingKey: AmqpRoutingKey,
+    private val serializer: KSerializer<T>
 ) {
+
+    val rawPayload: ByteArray by lazy { amqpJsonConfig.encodeToString(serializer, payload).toByteArray() }
+
     operator fun get(key: AmqpMessageProperty): Outcome<AmqpConsumingError, String> =
         headers[key.name]
             ?.let { Success(it) }

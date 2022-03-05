@@ -13,11 +13,14 @@ It relies on the official [RabbitMQ client for Java](https://www.rabbitmq.com/ap
 * Configurable queues (durability, explicitness, auto-deletion)
 * Configurable forwarding of dead-letter messages
 * Automatic connection and channel recovery
+* Pausing and resuming consumers
+* Custom hooks on successful message publication / consumption
 
 ### Currently unsupported
 * Publishing and processing messages in batches
 * Implicit message acknowledgements
-* Dynamic subscription and un-subscription 
+* Dynamic subscription and un-subscription
+* Confirmations for replies from consumers
 
 ## Getting started
 1. Add the amqp-connector dependency to your Gradle build script
