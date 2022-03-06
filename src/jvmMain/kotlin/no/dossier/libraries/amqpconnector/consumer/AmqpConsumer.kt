@@ -27,7 +27,7 @@ class AmqpConsumer<T : Any, U : Any>(
     private val messageProcessingCoroutineScope: CoroutineScope,
     private val onMessageConsumed: (message: AmqpInboundMessage<T>) -> Unit,
     private val onMessageRejected: (message: AmqpInboundMessage<T>) -> Unit,
-    private val onMessageReplyPublished: (message: AmqpOutboundMessage<*>) -> Unit,
+    private val onMessageReplyPublished: (message: AmqpOutboundMessage<*>, String) -> Unit,
 ) {
     private val logger = KotlinLogging.logger { }
 
@@ -289,7 +289,7 @@ class AmqpConsumer<T : Any, U : Any>(
                     // This is executed in the consumerThreadPool, so it is fine that it will block
                     @Suppress("BlockingMethodInNonBlockingContext")
                     amqpChannel.basicPublish(replyToExchange, routingKey, replyProperties, message.rawPayload)
-                    onMessageReplyPublished(message)
+                    onMessageReplyPublished(message, routingKey)
                 } catch (e: IOException) {
                     logger.debug { "AMQP Consumer - failed to send reply" }
                 }
