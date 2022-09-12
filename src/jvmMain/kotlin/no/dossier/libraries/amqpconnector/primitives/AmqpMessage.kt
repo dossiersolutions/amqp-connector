@@ -16,6 +16,11 @@ enum class AmqpMessageProperty {
     REPLY_TO_EXCHANGE
 }
 
+enum class AmqpMessageDeliveryMode(val code: Int) {
+    TRANSIENT(1),
+    PERSISTENT(2);
+}
+
 data class AmqpInboundMessage<T>(
     val rawPayload: ByteArray,
     val headers: Map<String, String> = mapOf(),
@@ -92,7 +97,8 @@ data class AmqpOutboundMessage<T>(
     val replyTo: String?,
     val correlationId: String?,
     val routingKey: AmqpRoutingKey,
-    private val serializer: KSerializer<T>
+    private val serializer: KSerializer<T>,
+    val deliveryMode: AmqpMessageDeliveryMode = AmqpMessageDeliveryMode.PERSISTENT
 ) {
 
     val rawPayload: ByteArray by lazy { amqpJsonConfig.encodeToString(serializer, payload).toByteArray() }

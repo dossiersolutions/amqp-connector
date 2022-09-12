@@ -152,7 +152,7 @@ class AmqpPublisher(
 
     private fun buildProperties(message: AmqpOutboundMessage<*>): AMQP.BasicProperties? {
         val amqpPropertiesBuilder = AMQP.BasicProperties().builder()
-            .deliveryMode(2 /*persistent*/)
+            .deliveryMode(message.deliveryMode.code)
             .headers(message.headers)
 
         message.replyTo?.run { amqpPropertiesBuilder.replyTo(message.replyTo) }
