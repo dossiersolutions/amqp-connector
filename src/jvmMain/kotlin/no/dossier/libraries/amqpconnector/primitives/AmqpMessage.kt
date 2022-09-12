@@ -87,8 +87,9 @@ inline fun <reified T> AmqpOutboundMessage(
     replyTo: String? = null,
     correlationId: String? = null,
     routingKey: AmqpRoutingKey = AmqpRoutingKey.PublisherDefault,
+    deliveryMode: AmqpMessageDeliveryMode = AmqpMessageDeliveryMode.PERSISTENT
 ): AmqpOutboundMessage<T> = AmqpOutboundMessage(
-    payload, headers, replyTo, correlationId, routingKey, serializer()
+    payload, headers, replyTo, correlationId, routingKey, serializer(), deliveryMode
 )
 
 data class AmqpOutboundMessage<T>(
