@@ -74,6 +74,14 @@ data class AmqpInboundMessage<T>(
         return result
     }
 
+    override fun toString(): String = """
+        AmqpInboundMessage(
+          routingKey = $routingKey
+          headers = $headers
+          replyTo = $replyTo, correlationId = $correlationId
+          rawPayload = ${rawPayload.decodeToString()}
+        )
+    """.trimIndent()
 }
 
 /*
