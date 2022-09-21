@@ -102,8 +102,9 @@ fun ConsumingAmqpConnectorConfigPrototype.consumerWithExhaustiveConfiguration() 
         onMessageRejected = { message ->
             //log message
         } // Default: { _ -> }
-        onMessageReplyPublished = { message ->
+        onMessageReplyPublished = { message, actualRoutingKey ->
             //log message
         } // Default: { _ -> }
+        autoAckEnabled = true // Default: false
     }
 }
