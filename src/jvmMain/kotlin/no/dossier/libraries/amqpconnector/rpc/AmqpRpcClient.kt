@@ -117,7 +117,8 @@ class AmqpRpcClient<U: Any>(
             messageProcessingCoroutineScope,
             onReplyConsumed,
             onReplyRejected,
-            onMessageReplyPublished = { _, _ ->}
+            onMessageReplyPublished = { _, _ ->},
+            false
         )
 
         publisher = AmqpPublisher(

@@ -126,7 +126,8 @@ class AmqpConsumerPrototype<T: Any>(
     var messageProcessingCoroutineScope: CoroutineScope? = null,
     var onMessageConsumed: (message: AmqpInboundMessage<T>) -> Unit = { _ -> },
     var onMessageRejected: (message: AmqpInboundMessage<T>) -> Unit = { _ -> },
-    var onMessageReplyPublished: (message: AmqpOutboundMessage<*>, actualRoutingKey: String) -> Unit = { _, _ -> }
+    var onMessageReplyPublished: (message: AmqpOutboundMessage<*>, actualRoutingKey: String) -> Unit = { _, _ -> },
+    var autoAckEnabled: Boolean = false
 ) {
     private val amqpExchangeSpecPrototype = AmqpExchangeSpecPrototype()
     private val amqpQueueSpecPrototype = AmqpQueueSpecPrototype()
@@ -171,7 +172,8 @@ class AmqpConsumerPrototype<T: Any>(
                 messageProcessingCoroutineScope,
                 onMessageConsumed,
                 onMessageRejected,
-                onMessageReplyPublished
+                onMessageReplyPublished,
+                autoAckEnabled
             )
         )
     }

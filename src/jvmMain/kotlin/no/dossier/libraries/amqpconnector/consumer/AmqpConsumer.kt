@@ -28,14 +28,19 @@ class AmqpConsumer<T : Any, U : Any>(
     private val onMessageConsumed: (message: AmqpInboundMessage<T>) -> Unit,
     private val onMessageRejected: (message: AmqpInboundMessage<T>) -> Unit,
     private val onMessageReplyPublished: (message: AmqpOutboundMessage<*>, String) -> Unit,
+    private val autoAckEnabled: Boolean
 ) {
     private val logger = KotlinLogging.logger { }
 
-    private var connection: Connection? = null
-    private var consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher? = null
-    private var tag: String? = null
-    private var amqpChannel: Channel? = null
-    private var actualMainQueueName: String? = null
+    private class AmqpConsumerState(
+        var connection: Connection? = null,
+        var consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher? = null,
+        var tag: String? = null,
+        var amqpChannel: Channel? = null,
+        var actualMainQueueName: String? = null
+    )
+
+    private val state: AmqpConsumerState = AmqpConsumerState()
 
     private val deadLetterRoutingKey = when (deadLetterSpec.routingKey) {
         is DeadLetterRoutingKey.Custom -> deadLetterSpec.routingKey.routingKey
@@ -118,14 +123,18 @@ class AmqpConsumer<T : Any, U : Any>(
 
     fun startConsuming(connection: Connection, consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher): String {
 
-        this.connection = connection
-        this.consumerThreadPoolDispatcher = consumerThreadPoolDispatcher
+        state.connection = connection
+        state.consumerThreadPoolDispatcher = consumerThreadPoolDispatcher
 
         val amqpChannel = connection.createChannel()
         val actualMainQueueName = createMainExchangesAndQueue(amqpChannel)
+
+        state.amqpChannel = amqpChannel
+        state.actualMainQueueName = actualMainQueueName
+
         createErrorExchangesAndQueue(amqpChannel, actualMainQueueName)
 
-        this.tag = amqpChannel.basicConsume(actualMainQueueName, false,
+        state.tag = amqpChannel.basicConsume(actualMainQueueName, autoAckEnabled,
             getDeliverCallback(consumerThreadPoolDispatcher, amqpChannel)
         ) { _ -> }
 
@@ -171,7 +180,7 @@ class AmqpConsumer<T : Any, U : Any>(
         }
     }
 
-    fun pause(): Outcome<AmqpConfigurationError, Unit> =
+    fun pause(): Outcome<AmqpConfigurationError, Unit> = with(state) {
         if (connection != null
             && consumerThreadPoolDispatcher != null
             && tag != null
@@ -179,28 +188,29 @@ class AmqpConsumer<T : Any, U : Any>(
             && actualMainQueueName != null
         ) {
             amqpChannel!!.basicCancel(tag)
-            this.tag = null
+            tag = null
             Success(Unit)
-        }
-        else {
+        } else {
             Failure(AmqpConfigurationError("Unable to pause consumer, it isn't running"))
         }
+    }
 
-    fun unpause(): Outcome<AmqpConfigurationError, Unit> =
+    fun unpause(): Outcome<AmqpConfigurationError, Unit> = with(state) {
         if (connection != null
             && consumerThreadPoolDispatcher != null
             && tag == null
             && amqpChannel != null
             && actualMainQueueName != null
         ) {
-            this.tag = amqpChannel!!.basicConsume(actualMainQueueName, false,
+            tag = amqpChannel!!.basicConsume(
+                actualMainQueueName, autoAckEnabled,
                 getDeliverCallback(consumerThreadPoolDispatcher!!, amqpChannel!!)
             ) { _ -> }
             Success(Unit)
-        }
-        else {
+        } else {
             Failure(AmqpConfigurationError("Unable to unpause consumer, it isn't paused"))
         }
+    }
 
     private suspend fun processMessage(message: AmqpInboundMessage<T>) {
         logger.debug { "Processing message: $message" }
@@ -286,7 +296,7 @@ class AmqpConsumer<T : Any, U : Any>(
                         .deliveryMode(2 /*persistent*/)
                         .build()
 
-                    // This is executed in the consumerThreadPool, so it is fine that it will block
+                    // This is dispatched to the consumerThreadPool, so it is fine that it will block
                     @Suppress("BlockingMethodInNonBlockingContext")
                     amqpChannel.basicPublish(replyToExchange, routingKey, replyProperties, message.rawPayload)
                     onMessageReplyPublished(message, routingKey)
@@ -308,7 +318,7 @@ class AmqpConsumer<T : Any, U : Any>(
             logger.debug { "AMQP Consumer - sending $operationName" }
 
             try {
-                // This is executed in the consumerThreadPool, so it is fine that it will block
+                // This is dispatched to the consumerThreadPool, so it is fine that it will block
                 @Suppress("BlockingMethodInNonBlockingContext")
                 if (acknowledge) {
                     amqpChannel.basicAck(deliveryTag, false)
