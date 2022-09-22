@@ -254,15 +254,23 @@ class AmqpConsumer<T : Any, U : Any>(
                         }
                     }
                 }
-                message.acknowledge()
+                if (!autoAckEnabled) message.acknowledge()
                 onMessageConsumed(message)
             }
             is Failure -> {
-                logger.warn {
-                    "Message processing finished with Failure, dispatching REJECT\n" +
-                    result.error.toString()
+                if (!autoAckEnabled) {
+                    logger.warn {
+                        "Message processing finished with Failure, dispatching REJECT\n" +
+                                result.error.toString()
+                    }
+                    message.reject()
                 }
-                message.reject()
+                else {
+                    logger.warn {
+                        "Message processing finished with Failure (but auto-acknowledging is enabled)\n" +
+                                result.error.toString()
+                    }
+                }
                 onMessageRejected(message)
             }
         }
