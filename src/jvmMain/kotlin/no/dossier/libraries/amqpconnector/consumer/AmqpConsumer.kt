@@ -228,12 +228,14 @@ class AmqpConsumer<T : Any, U : Any>(
 
         when (val result = messageHandler(message)) {
             is Success -> {
-                logger.debug { "Message processing finished with Success, dispatching ACK" }
+                logger.debug { "Message processing finished with Success" }
                 when (replyingMode) {
                     AmqpReplyingMode.Always,
                     AmqpReplyingMode.IfRequired -> if (messageHasReplyPropertiesSet) {
                         try {
-                            logger.debug { "Message processing finished with Success, dispatching REPLY" }
+                            logger.debug { "Sending reply message to ${message.replyTo} " +
+                                    "with correlationId ${message.correlationId}" }
+
                             val replyToExchange = message.headers[AmqpMessageProperty.REPLY_TO_EXCHANGE.name] ?: ""
                             val reply = AmqpOutboundMessage(
                                 payload = result.value,
@@ -254,7 +256,10 @@ class AmqpConsumer<T : Any, U : Any>(
                         }
                     }
                 }
-                if (!autoAckEnabled) message.acknowledge()
+                if (!autoAckEnabled) {
+                    logger.debug { "Sending ACK" }
+                    message.acknowledge()
+                }
                 onMessageConsumed(message)
             }
             is Failure -> {
