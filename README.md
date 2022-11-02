@@ -1,5 +1,4 @@
-AMQP-Connector is a library for integration with AMQP broker (RabbitMQ).
-It relies on the official [RabbitMQ client for Java](https://www.rabbitmq.com/api-guide.html).
+amqp-connector is a RabbitMQ/AMQP client library relying on the official [RabbitMQ client for Java](https://www.rabbitmq.com/api-guide.html).
 
 ## Features
 * Publish/Subscribe, Direct notifications, Broadcasts, Request / Reply schemes (RPC)
@@ -13,10 +12,10 @@ It relies on the official [RabbitMQ client for Java](https://www.rabbitmq.com/ap
 * Automatic connection and channel recovery
 * Pausing and resuming consumers
 * Custom hooks on successful message publication / consumption
+* Implicit message acknowledgements
 
 ### Currently unsupported
 * Publishing and processing messages in batches
-* Implicit message acknowledgements
 * Dynamic subscription and un-subscription
 * Confirmations for replies from consumers
 
@@ -25,7 +24,7 @@ It relies on the official [RabbitMQ client for Java](https://www.rabbitmq.com/ap
 
        implementation("no.dossier.libraries:amqp-connector:0.1.0")
 
-3. Create instance of the connector using DSL and start publishing and/or consuming messages
+3. Create an instance of the connector using dedicated Kotlin DSL and start publishing and/or consuming messages
 
     ```
     class ExampleResource {
@@ -58,3 +57,6 @@ See the internal Javadoc for more details
 
 ## License
 See [LICENSE](LICENSE)
+
+## Contribute
+Any contributions and improvements are very welcome. Feel free to submit any pull-requests.
