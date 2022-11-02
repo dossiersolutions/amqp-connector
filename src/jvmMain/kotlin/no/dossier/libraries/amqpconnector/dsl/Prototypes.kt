@@ -17,8 +17,8 @@ import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
 import no.dossier.libraries.amqpconnector.primitives.*
 import no.dossier.libraries.amqpconnector.publisher.AmqpPublisher
 import no.dossier.libraries.amqpconnector.rpc.AmqpRpcClient
+import no.dossier.libraries.amqpconnector.utils.getValidatedUri
 import no.dossier.libraries.functional.*
-import no.dossier.libraries.stl.getValidatedUri
 import java.util.concurrent.Executors
 
 /**
@@ -254,7 +254,7 @@ class AmqpRpcClientPrototype<U: Any>(
         publishingConnection: Connection,
         consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher,
         responsePayloadSerializer: KSerializer<U>
-    ): Outcome<AmqpConfigurationError, AmqpRpcClient<U>> = attemptBuildResult {
+    ): Outcome<AmqpConfigurationError, AmqpRpcClient<U>> = composeOutcome {
 
         val (exchangeSpec) = amqpExchangeSpecPrototype.build()
         val (replyToExchangeSpec) = amqpReplyToExchangeSpecPrototype.build()

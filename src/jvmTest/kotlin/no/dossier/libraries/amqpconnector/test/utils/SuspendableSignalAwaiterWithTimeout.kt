@@ -1,9 +1,9 @@
 package no.dossier.libraries.amqpconnector.test.utils
 
 import kotlinx.coroutines.CancellableContinuation
+import no.dossier.libraries.amqpconnector.utils.suspendCancellableCoroutineWithTimeout
 import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Outcome
-import no.dossier.libraries.stl.suspendCancellableCoroutineWithTimeout
 import kotlin.coroutines.resume
 
 class SuspendableSignalAwaiterWithTimeout<E, T>(

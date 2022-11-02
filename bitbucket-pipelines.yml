@@ -1,0 +1,42 @@
+clone:
+  depth: full
+
+definitions:
+  services:
+    docker:
+      memory: 2000
+  caches:
+    gradlewrapper: ~/.gradle/wrapper
+
+pipelines:
+  branches:
+    main:
+      - step:
+          name: Build Artifacts
+          caches:
+            - gradle
+            - gradlewrapper
+          script:
+            - ./gradlew build -x allTests -x jvmTest
+          artifacts:
+            - build/**/*.*
+            - ./**/*.*
+      - parallel:
+          - step:
+              name: Run tests
+              services:
+                - docker
+              caches:
+                - gradle
+                - gradlewrapper
+              script:
+                - docker login --username "$DOCKER_USERNAME" --password "$DOCKER_PASSWORD"
+                - ./gradlew allTests
+          - step:
+              name: Upload to Maven Central
+              script:
+                - ./gradlew publish closeAndReleaseStagingRepository
+
+
+
+

@@ -11,9 +11,9 @@ import no.dossier.libraries.amqpconnector.consumer.AmqpConsumer
 import no.dossier.libraries.amqpconnector.consumer.AmqpReplyingMode
 import no.dossier.libraries.amqpconnector.primitives.*
 import no.dossier.libraries.functional.*
-import no.dossier.libraries.stl.getValidatedUUID
 import no.dossier.libraries.amqpconnector.publisher.AmqpPublisher
-import no.dossier.libraries.stl.suspendCancellableCoroutineWithTimeout
+import no.dossier.libraries.amqpconnector.utils.getValidatedUUID
+import no.dossier.libraries.amqpconnector.utils.suspendCancellableCoroutineWithTimeout
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap

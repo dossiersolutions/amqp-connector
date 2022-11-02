@@ -8,8 +8,8 @@ import mu.KotlinLogging
 import no.dossier.libraries.amqpconnector.error.AmqpConfigurationError
 import no.dossier.libraries.amqpconnector.error.AmqpPublishingError
 import no.dossier.libraries.amqpconnector.primitives.*
+import no.dossier.libraries.amqpconnector.utils.suspendCancellableCoroutineWithTimeout
 import no.dossier.libraries.functional.*
-import no.dossier.libraries.stl.suspendCancellableCoroutineWithTimeout
 import java.util.concurrent.ConcurrentSkipListMap
 import kotlin.coroutines.resume
 
