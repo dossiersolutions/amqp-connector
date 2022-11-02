@@ -1,5 +1,8 @@
 amqp-connector is a RabbitMQ/AMQP client library relying on the official [RabbitMQ client for Java](https://www.rabbitmq.com/api-guide.html).
 
+![GitHub](https://img.shields.io/github/license/dossiersolutions/amqp-connector)
+![Maven Central](https://img.shields.io/maven-central/v/no.dossier.libraries/amqp-connector)
+
 ## Features
 * Publish/Subscribe, Direct notifications, Broadcasts, Request / Reply schemes (RPC)
 * Fast async publishing using Kotlin coroutines
