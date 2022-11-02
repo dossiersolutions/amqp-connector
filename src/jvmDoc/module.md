@@ -26,7 +26,7 @@ It relies on the official [RabbitMQ client for Java](https://www.rabbitmq.com/ap
 1. Add the amqp-connector dependency to your Gradle build script
 
  
-       implementation("no.dossier.libraries:amqp-connector:0.15")
+       implementation("no.dossier.libraries:amqp-connector:0.1.0")
 
 3. Create instance of the connector using DSL and start publishing and/or consuming messages
 
