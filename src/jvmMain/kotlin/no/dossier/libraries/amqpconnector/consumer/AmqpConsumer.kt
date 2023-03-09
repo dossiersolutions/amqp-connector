@@ -309,8 +309,6 @@ class AmqpConsumer<T : Any, U : Any>(
                         .deliveryMode(2 /*persistent*/)
                         .build()
 
-                    // This is dispatched to the consumerThreadPool, so it is fine that it will block
-                    @Suppress("BlockingMethodInNonBlockingContext")
                     amqpChannel.basicPublish(replyToExchange, routingKey, replyProperties, message.rawPayload)
                     onMessageReplyPublished(message, routingKey)
                 } catch (e: IOException) {
@@ -331,8 +329,14 @@ class AmqpConsumer<T : Any, U : Any>(
             logger.debug { "AMQP Consumer - sending $operationName" }
 
             try {
-                // This is dispatched to the consumerThreadPool, so it is fine that it will block
-                @Suppress("BlockingMethodInNonBlockingContext")
+                /* We can currently only acknowledge 1 message at time because we use multiple threads.
+                  From RabbitMQ doc:
+                  When manual acknowledgements are used, it is important to consider what thread does the acknowledgement.
+                  If it's different from the thread that received the delivery (e.g. Consumer#handleDelivery delegated delivery handling to a different thread),
+                   acknowledging with the multiple parameter set to true is unsafe and will result in double-acknowledgements,
+                   and therefore a channel-level protocol exception that closes the channel.
+                   Acknowledging a single message at a time can be safe.
+                 */
                 if (acknowledge) {
                     amqpChannel.basicAck(deliveryTag, false)
                 } else {
