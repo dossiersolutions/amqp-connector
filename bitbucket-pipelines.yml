@@ -13,8 +13,6 @@ pipelines:
     main:
       - step:
           name: Build Artifacts
-          services:
-            - docker
           caches:
             - gradle
             - gradlewrapper
