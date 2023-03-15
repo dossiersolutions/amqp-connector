@@ -106,5 +106,6 @@ fun ConsumingAmqpConnectorConfigPrototype.consumerWithExhaustiveConfiguration() 
             //log message
         } // Default: { _ -> }
         autoAckEnabled = true // Default: false
+        prefetchCount = 2000 // Default: 5000
     }
 }

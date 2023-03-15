@@ -35,7 +35,8 @@ class AmqpRpcClient<U: Any>(
     private val consumerThreadPoolDispatcher: ExecutorCoroutineDispatcher,
     private val onReplyConsumed: (message: AmqpInboundMessage<U>) -> Unit,
     private val onReplyRejected: (message: AmqpInboundMessage<U>) -> Unit,
-    private val onRequestPublished: (message: AmqpOutboundMessage<*>, actualRoutingKey: String) -> Unit
+    private val onRequestPublished: (message: AmqpOutboundMessage<*>, actualRoutingKey: String) -> Unit,
+    private val consumerPrefetchCount: Int
 ) {
     @PublishedApi
     internal val logger = KotlinLogging.logger { }
@@ -118,7 +119,8 @@ class AmqpRpcClient<U: Any>(
             onReplyConsumed,
             onReplyRejected,
             onMessageReplyPublished = { _, _ ->},
-            false
+            false,
+            consumerPrefetchCount
         )
 
         publisher = AmqpPublisher(

@@ -127,7 +127,8 @@ class AmqpConsumerPrototype<T: Any>(
     var onMessageConsumed: (message: AmqpInboundMessage<T>) -> Unit = { _ -> },
     var onMessageRejected: (message: AmqpInboundMessage<T>) -> Unit = { _ -> },
     var onMessageReplyPublished: (message: AmqpOutboundMessage<*>, actualRoutingKey: String) -> Unit = { _, _ -> },
-    var autoAckEnabled: Boolean = false
+    var autoAckEnabled: Boolean = false,
+    var prefetchCount: Int = 5000
 ) {
     private val amqpExchangeSpecPrototype = AmqpExchangeSpecPrototype()
     private val amqpQueueSpecPrototype = AmqpQueueSpecPrototype()
@@ -173,7 +174,8 @@ class AmqpConsumerPrototype<T: Any>(
                 onMessageConsumed,
                 onMessageRejected,
                 onMessageReplyPublished,
-                autoAckEnabled
+                autoAckEnabled,
+                prefetchCount
             )
         )
     }
@@ -231,7 +233,8 @@ class AmqpRpcClientPrototype<U: Any>(
     var replyQueueBindingKey: AmqpBindingKey = AmqpBindingKey.QueueName,
     var onReplyConsumed: (message: AmqpInboundMessage<U>) -> Unit = { _ -> },
     var onReplyRejected: (message: AmqpInboundMessage<U>) -> Unit = { _ -> },
-    var onRequestPublished: (message: AmqpOutboundMessage<*>, actualRoutingKey: String) -> Unit = { _, _ -> }
+    var onRequestPublished: (message: AmqpOutboundMessage<*>, actualRoutingKey: String) -> Unit = { _, _ -> },
+    var prefetchCount: Int = 5000
 ) {
     private val amqpExchangeSpecPrototype = AmqpExchangeSpecPrototype().apply {
         type = AmqpExchangeType.DEFAULT // overridden default value
@@ -287,7 +290,8 @@ class AmqpRpcClientPrototype<U: Any>(
                 consumerThreadPoolDispatcher,
                 onReplyConsumed,
                 onReplyRejected,
-                onRequestPublished
+                onRequestPublished,
+                prefetchCount
             )
         )
     }

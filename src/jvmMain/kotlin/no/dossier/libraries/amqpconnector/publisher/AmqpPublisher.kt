@@ -70,14 +70,15 @@ class AmqpPublisher(
             ))
         }
         else {
-            val routingKey = getActualRoutingKey(message.routingKey)
+            val actualRoutingKey = getActualRoutingKey(message.routingKey)
+            val messageHeaders = message.headers.entries.joinToString()
 
             logger.debug {
                 "← \uD83D\uDCE8 AMQP Publisher - sending message " +
-                        "to [${exchangeSpec.name}] using routing key [$routingKey]"
+                        "to [${exchangeSpec.name}] using routing key [$actualRoutingKey], headers: [$messageHeaders]"
             }
 
-            submitMessage(message, routingKey)
+            submitMessage(message, actualRoutingKey)
         }
 
 
@@ -89,9 +90,10 @@ class AmqpPublisher(
 
         logger.debug {
             val sequenceNumberInfo = if (enableConfirmations) "(sequence number [$sequenceNumber]) " else ""
+            val messageHeaders = message.headers.entries.joinToString()
 
             "← \uD83D\uDCE8 AMQP Publisher - sending message $sequenceNumberInfo" +
-                    "to [${exchangeSpec.name}] using routing key [$actualRoutingKey]"
+                    "to [${exchangeSpec.name}] using routing key [$actualRoutingKey], headers: [$messageHeaders]"
         }
 
         if (enableConfirmations) {

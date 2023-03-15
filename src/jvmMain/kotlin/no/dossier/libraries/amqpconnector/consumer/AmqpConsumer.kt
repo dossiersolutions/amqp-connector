@@ -28,7 +28,8 @@ class AmqpConsumer<T : Any, U : Any>(
     private val onMessageConsumed: (message: AmqpInboundMessage<T>) -> Unit,
     private val onMessageRejected: (message: AmqpInboundMessage<T>) -> Unit,
     private val onMessageReplyPublished: (message: AmqpOutboundMessage<*>, String) -> Unit,
-    private val autoAckEnabled: Boolean
+    private val autoAckEnabled: Boolean,
+    private val prefetchCount: Int,
 ) {
     private val logger = KotlinLogging.logger { }
 
@@ -133,6 +134,8 @@ class AmqpConsumer<T : Any, U : Any>(
         state.actualMainQueueName = actualMainQueueName
 
         createErrorExchangesAndQueue(amqpChannel, actualMainQueueName)
+
+        amqpChannel.basicQos(prefetchCount)
 
         state.tag = amqpChannel.basicConsume(actualMainQueueName, autoAckEnabled,
             getDeliverCallback(consumerThreadPoolDispatcher, amqpChannel)
