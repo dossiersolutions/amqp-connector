@@ -11,6 +11,7 @@ It relies on the official [RabbitMQ client for Java](https://www.rabbitmq.com/ap
 * Fast parallel message processing using Kotlin coroutines
 * Enforced or on-demand replying
 * Configurable queues (durability, explicitness, auto-deletion)
+* Setting consumer prefetch count
 * Configurable forwarding of dead-letter messages
 * Automatic connection and channel recovery
 * Pausing and resuming consumers
@@ -18,7 +19,6 @@ It relies on the official [RabbitMQ client for Java](https://www.rabbitmq.com/ap
 
 ### Currently unsupported
 * Publishing and processing messages in batches
-* Implicit message acknowledgements
 * Dynamic subscription and un-subscription
 * Confirmations for replies from consumers
 
@@ -26,7 +26,7 @@ It relies on the official [RabbitMQ client for Java](https://www.rabbitmq.com/ap
 1. Add the amqp-connector dependency to your Gradle build script
 
  
-       implementation("no.dossier.libraries:amqp-connector:0.1.0")
+       implementation("no.dossier.libraries:amqp-connector:0.1.3")
 
 3. Create instance of the connector using DSL and start publishing and/or consuming messages
 
@@ -49,7 +49,7 @@ It relies on the official [RabbitMQ client for Java](https://www.rabbitmq.com/ap
            }
     
            suspend fun sampleProcessingFunction(message: AmqpInboundMessage<String>): Outcome<AmqpConsumingError, Unit> {
-               println(message.payload)
+               println(message.payload.forceGet())
                return Success(Unit)
            }
         

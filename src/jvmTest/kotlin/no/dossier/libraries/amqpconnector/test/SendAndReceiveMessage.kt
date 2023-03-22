@@ -16,6 +16,7 @@ import no.dossier.libraries.amqpconnector.test.utils.SuspendableSignalAwaiterWit
 import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Outcome
 import no.dossier.libraries.functional.Success
+import no.dossier.libraries.functional.forceGet
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.testcontainers.containers.Network
@@ -86,7 +87,7 @@ class SendAndReceiveMessageTest {
             onSomeDataMessage = { message ->
                 val expectedRoutingKey = "somedata.cool.special"
                 if (message.routingKey == expectedRoutingKey) {
-                    signalAwaiter.resume(Success(message.payload))
+                    signalAwaiter.resume(message.payload)
                 }
                 else {
                     signalAwaiter.resume(Failure(AmqpConsumingError(
@@ -98,7 +99,7 @@ class SendAndReceiveMessageTest {
             onOtherMessage = { message ->
                 val expectedRoutingKey = "other.data"
                 if (message.routingKey == expectedRoutingKey) {
-                    signalAwaiter.resume(Success("other: ${message.payload}"))
+                    signalAwaiter.resume(Success("other: ${message.payload.forceGet()}"))
                 }
                 else {
                     signalAwaiter.resume(Failure(AmqpConsumingError(

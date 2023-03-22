@@ -8,6 +8,7 @@ import no.dossier.libraries.amqpconnector.primitives.AmqpExchangeType
 import no.dossier.libraries.amqpconnector.primitives.AmqpInboundMessage
 import no.dossier.libraries.amqpconnector.primitives.AmqpOutboundMessage
 import no.dossier.libraries.functional.Success
+import no.dossier.libraries.functional.forceGet
 import no.dossier.libraries.functional.getOrElse
 import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -148,15 +149,15 @@ class FederationTest {
         domain1Connector = connector(role = AmqpConnectorRole.PublisherAndConsumer) {
             connectionString = domain1Container.amqpUrl
 
-            consumer({ message: AmqpInboundMessage<String> -> Success("domain1-rpc-internal: ${message.payload}") }) {
+            consumer({ message: AmqpInboundMessage<String> -> Success("domain1-rpc-internal: ${message.payload.forceGet()}") }) {
                 replyingMode = AmqpReplyingMode.IfRequired
                 messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
                 exchange { name = "domain1.internal" }
             }
 
             consumer({ message: AmqpInboundMessage<String> ->
-                resumeWith("domain1: ${message.payload}")
-                Success("domain1-rpc-federated: ${message.payload}")
+                resumeWith("domain1: ${message.payload.forceGet()}")
+                Success("domain1-rpc-federated: ${message.payload.forceGet()}")
             }) {
                 replyingMode = AmqpReplyingMode.IfRequired
                 messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
@@ -168,7 +169,7 @@ class FederationTest {
             connectionString = domain2Container.amqpUrl
 
             consumer({ message: AmqpInboundMessage<String> ->
-                Success("domain2-rpc-federated: ${message.payload}")
+                Success("domain2-rpc-federated: ${message.payload.forceGet()}")
             }) {
                 replyingMode = AmqpReplyingMode.IfRequired
                 messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
@@ -176,8 +177,8 @@ class FederationTest {
             }
 
             consumer({ message: AmqpInboundMessage<String> ->
-                resumeWith("domain2: ${message.payload}")
-                Success("domain2-rpc-federated: ${message.payload}")
+                resumeWith("domain2: ${message.payload.forceGet()}")
+                Success("domain2-rpc-federated: ${message.payload.forceGet()}")
             }) {
                 replyingMode = AmqpReplyingMode.IfRequired
                 messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
@@ -189,7 +190,7 @@ class FederationTest {
             connectionString = crossdomainContainer.amqpUrl
 
             consumer({ message: AmqpInboundMessage<String> ->
-                Success("crossdomain-rpc-federated: ${message.payload}")
+                Success("crossdomain-rpc-federated: ${message.payload.forceGet()}")
             }) {
                 replyingMode = AmqpReplyingMode.IfRequired
                 messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
@@ -197,8 +198,8 @@ class FederationTest {
             }
 
             consumer({ message: AmqpInboundMessage<String> ->
-                resumeWith("crossdomain: ${message.payload}")
-                Success("crossdomain-rpc-federated: ${message.payload}")
+                resumeWith("crossdomain: ${message.payload.forceGet()}")
+                Success("crossdomain-rpc-federated: ${message.payload.forceGet()}")
             }) {
                 replyingMode = AmqpReplyingMode.IfRequired
                 messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)

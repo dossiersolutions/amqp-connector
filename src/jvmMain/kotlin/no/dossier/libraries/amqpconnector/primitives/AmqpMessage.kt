@@ -1,7 +1,6 @@
 package no.dossier.libraries.amqpconnector.primitives
 
 import kotlinx.serialization.KSerializer
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.serializer
 import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
 import no.dossier.libraries.amqpconnector.serialization.amqpJsonConfig
@@ -35,7 +34,16 @@ data class AmqpInboundMessage<T>(
     val routingKey: String,
     private val serializer: KSerializer<T>
 ) {
-    val payload: T by lazy { amqpJsonConfig.decodeFromString(serializer, String(rawPayload)) }
+    val payload: Outcome<AmqpConsumingError ,T> by lazy {
+        try {
+            val payload = amqpJsonConfig.decodeFromString(serializer, String(rawPayload))
+            Success(payload)
+        }
+        catch (e: Throwable) {
+            Failure(AmqpConsumingError("Unable to deserialize message payload: ${e.message}" +
+                    "\n Headers: ${this.headers} \n RoutingKey: ${this.routingKey}"))
+        }
+    }
 
     operator fun get(key: AmqpMessageProperty): Outcome<AmqpConsumingError, String> =
         headers[key.name]

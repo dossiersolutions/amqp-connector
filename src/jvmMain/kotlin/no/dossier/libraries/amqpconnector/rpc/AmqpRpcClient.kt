@@ -79,7 +79,9 @@ class AmqpRpcClient<U: Any>(
                         }
                     }
                     else {
-                        continuation.resume(Success(message.payload))
+                        continuation.resume(message.payload.mapError {
+                            AmqpRpcError(it.message, mapOf("Payload" to it))
+                        })
                     }
                 }
             }

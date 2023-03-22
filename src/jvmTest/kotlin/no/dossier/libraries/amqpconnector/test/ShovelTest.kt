@@ -10,10 +10,7 @@ import no.dossier.libraries.amqpconnector.primitives.AmqpExchangeType
 import no.dossier.libraries.amqpconnector.primitives.AmqpInboundMessage
 import no.dossier.libraries.amqpconnector.primitives.AmqpOutboundMessage
 import no.dossier.libraries.amqpconnector.publisher.AmqpPublisher
-import no.dossier.libraries.functional.Failure
-import no.dossier.libraries.functional.Outcome
-import no.dossier.libraries.functional.Success
-import no.dossier.libraries.functional.getOrElse
+import no.dossier.libraries.functional.*
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeAll
@@ -190,7 +187,7 @@ class ShovelTest {
             addSuspendingConsumer("Domain 2", "crossdomain", "domain2.key")
 
             consumer({ message: AmqpInboundMessage<String> ->
-                Success("Domain 2 received: ${message.payload}")
+                Success("Domain 2 received: ${message.payload.forceGet()}")
             }) {
                 messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
                 bindingKey = AmqpBindingKey.Custom("domain2.rpc")
@@ -208,7 +205,7 @@ class ShovelTest {
             addSuspendingConsumer("Crossdomain", "crossdomain", "crossdomain.key")
 
             consumer({ message: AmqpInboundMessage<String> ->
-                Success("Crossdomain received: ${message.payload}")
+                Success("Crossdomain received: ${message.payload.forceGet()}")
             }) {
                 messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
                 bindingKey = AmqpBindingKey.Custom("crossdomain.rpc")
@@ -226,7 +223,7 @@ class ShovelTest {
         bindingKey: String
     ) {
         consumer({ message: AmqpInboundMessage<String> ->
-            resumeWith("$consumerName received: ${message.payload}")
+            resumeWith("$consumerName received: ${message.payload.forceGet()}")
             Success("Ok")
         }) {
             messageProcessingCoroutineScope = CoroutineScope(Dispatchers.Default)
