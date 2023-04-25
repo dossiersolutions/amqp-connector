@@ -41,7 +41,7 @@ class AmqpPublisher(
                 amqpChannel = publishingConnection.createChannel()
 
                 if (exchangeSpec.type != AmqpExchangeType.DEFAULT)
-                    amqpChannel.exchangeDeclare(exchangeSpec.name, exchangeSpec.type.stringRepresentation)
+                    amqpChannel.exchangeDeclare(exchangeSpec.name, exchangeSpec.type.stringRepresentation, exchangeSpec.durable)
 
                 if (enableConfirmations) {
                     runCatching({

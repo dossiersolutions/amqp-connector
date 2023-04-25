@@ -78,6 +78,7 @@ fun ConsumingAmqpConnectorConfigPrototype.consumerWithExhaustiveConfiguration() 
         exchange {
             name = "some-ref-data" // Default: "" (default exchange)
             type = AmqpExchangeType.DIRECT // Default: AmqpExchangeType.TOPIC
+            durable = true // Default: false
         }
         queue {
             name = "dossier-sample-app-ref-data-inbound" // Default: "" (server generated name)

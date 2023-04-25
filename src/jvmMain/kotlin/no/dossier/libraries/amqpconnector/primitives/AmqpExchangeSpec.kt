@@ -10,5 +10,6 @@ enum class AmqpExchangeType(val stringRepresentation: String) {
 
 data class AmqpExchangeSpec(
     val name: String,
-    val type: AmqpExchangeType
+    val type: AmqpExchangeType,
+    val durable: Boolean
 )

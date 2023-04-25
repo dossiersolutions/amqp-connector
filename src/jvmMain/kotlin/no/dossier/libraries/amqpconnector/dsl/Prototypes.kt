@@ -105,7 +105,7 @@ class AmqpDeadLetterSpecPrototype(
         amqpExchangeSpecPrototype.apply(builder)
     }
 
-    fun build(): Outcome<AmqpConfigurationError, AmqpDeadLetterSpec> = attemptBuildResult {
+    fun build(): Outcome<AmqpConfigurationError, AmqpDeadLetterSpec> = composeOutcome {
         val (exchangeSpec) = amqpExchangeSpecPrototype.build()
 
         Success(
@@ -184,13 +184,15 @@ class AmqpConsumerPrototype<T: Any>(
 @AmqpConnectorDsl
 class AmqpExchangeSpecPrototype(
     var name: String = "",
-    var type: AmqpExchangeType = AmqpExchangeType.TOPIC
+    var type: AmqpExchangeType = AmqpExchangeType.TOPIC,
+    var durable: Boolean = false
 ) {
     fun build(): Outcome<AmqpConfigurationError, AmqpExchangeSpec> =
         Success(
             AmqpExchangeSpec(
                 name,
                 type,
+                durable
             )
         )
 }

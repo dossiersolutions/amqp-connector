@@ -76,7 +76,7 @@ class AmqpConsumer<T : Any, U : Any>(
         }
 
         if (exchangeSpec.type != AmqpExchangeType.DEFAULT) {
-            exchangeDeclare(exchangeSpec.name, exchangeSpec.type.stringRepresentation)
+            exchangeDeclare(exchangeSpec.name, exchangeSpec.type.stringRepresentation, exchangeSpec.durable)
             logger.debug { "Exchange [${exchangeSpec.name}] created" }
             queueBind(actualQueueName, exchangeSpec.name, actualBindingKey)
             logger.debug {
@@ -92,7 +92,11 @@ class AmqpConsumer<T : Any, U : Any>(
             val exchangeName = deadLetterSpec.exchangeSpec.name
 
             if (exchangeSpec.type != AmqpExchangeType.DEFAULT) {
-                exchangeDeclare(exchangeName, deadLetterSpec.exchangeSpec.type.stringRepresentation)
+                exchangeDeclare(
+                    exchangeName,
+                    deadLetterSpec.exchangeSpec.type.stringRepresentation,
+                    deadLetterSpec.exchangeSpec.durable
+                )
                 logger.debug { "Dead-letter exchange [$exchangeName] created" }
             }
 
