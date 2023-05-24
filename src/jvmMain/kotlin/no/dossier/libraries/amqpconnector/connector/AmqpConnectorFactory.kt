@@ -26,7 +26,7 @@ sealed class AmqpConnectorFactory<C: AmqpConnector, S: AmqpConnectorConfig> {
         )
     }
     catch (e: Exception) {
-        Failure(AmqpConnectionError("Cannot connect to AMQP broker: ${e.message}"))
+        Failure(AmqpConnectionError("Cannot connect to AMQP broker: ${e.message ?: e.cause?.message}"))
     }
 
     protected fun createNewConsumingConnection(
@@ -49,6 +49,11 @@ sealed class AmqpConnectorFactory<C: AmqpConnector, S: AmqpConnectorConfig> {
     ): Outcome<AmqpConnectionFactoryError, ConnectionFactory> = try {
         Success(ConnectionFactory().apply {
             setUri(amqpConnectionConfig.connectionURI)
+            if (virtualHost == "" || virtualHost == null) {
+                // default virtual host, because it if the URI contains just trailing "/"
+                // it will use an empty string as virtualHost
+                virtualHost = "/"
+            }
         })
     } catch (e: Exception) {
         Failure(AmqpConnectionFactoryError("Cannot configure connection factory: ${e.message}"))
@@ -60,7 +65,7 @@ object PublishingAmqpConnectorFactory
 
     override fun create(
         amqpConnectorConfig: GenericAmqpConnectorConfig
-    ): Outcome<AmqpError, PublishingAmqpConnectorImpl> = attemptBuildResult {
+    ): Outcome<AmqpError, PublishingAmqpConnectorImpl> = composeOutcome {
 
         Success(PublishingAmqpConnectorImpl(
             amqpConnectorConfig,
@@ -77,19 +82,21 @@ object ConsumingAmqpConnectorFactory
 
     override fun create(
         amqpConnectorConfig: ConsumingAmqpConnectorConfig
-    ): Outcome<AmqpError, ConsumingAmqpConnectorImpl> = attemptBuildResult {
+    ): Outcome<AmqpError, ConsumingAmqpConnectorImpl> = composeOutcome {
         val executorService = Executors.newFixedThreadPool(32) //This should be a parameter
 
-        Success(ConsumingAmqpConnectorImpl(
-            amqpConnectorConfig,
-            !createNewConsumingConnection(
-                !createConnectionFactory(amqpConnectorConfig),
-                amqpConnectorConfig.connectionName + "-consumer",
-                amqpConnectorConfig.consumers,
-                executorService
-            ),
-            executorService.asCoroutineDispatcher()
-        ))
+        Success(
+            ConsumingAmqpConnectorImpl(
+                amqpConnectorConfig,
+                !createNewConsumingConnection(
+                    !createConnectionFactory(amqpConnectorConfig),
+                    amqpConnectorConfig.connectionName + "-consumer",
+                    amqpConnectorConfig.consumers,
+                    executorService
+                ),
+                executorService.asCoroutineDispatcher()
+            )
+        )
     }
 }
 
@@ -98,23 +105,25 @@ object PublishingConsumingAmqpConnectorFactory
 
     override fun create(
         amqpConnectorConfig: ConsumingAmqpConnectorConfig
-    ): Outcome<AmqpError, PublishingConsumingAmqpConnectorImpl> = attemptBuildResult {
+    ): Outcome<AmqpError, PublishingConsumingAmqpConnectorImpl> = composeOutcome {
         val connectionFactory = !createConnectionFactory(amqpConnectorConfig)
         val executorService = Executors.newFixedThreadPool(32) //This should be a parameter
 
-        Success(PublishingConsumingAmqpConnectorImpl(
-            amqpConnectorConfig,
-            !createNewConnection(
-                connectionFactory,
-                amqpConnectorConfig.connectionName + "-publisher"
-            ),
-            !createNewConsumingConnection(
-                connectionFactory,
-                amqpConnectorConfig.connectionName + "-consumer",
-                amqpConnectorConfig.consumers,
-                executorService
-            ),
-            executorService.asCoroutineDispatcher()
-        ))
+        Success(
+            PublishingConsumingAmqpConnectorImpl(
+                amqpConnectorConfig,
+                !createNewConnection(
+                    connectionFactory,
+                    amqpConnectorConfig.connectionName + "-publisher"
+                ),
+                !createNewConsumingConnection(
+                    connectionFactory,
+                    amqpConnectorConfig.connectionName + "-consumer",
+                    amqpConnectorConfig.consumers,
+                    executorService
+                ),
+                executorService.asCoroutineDispatcher()
+            )
+        )
     }
 }

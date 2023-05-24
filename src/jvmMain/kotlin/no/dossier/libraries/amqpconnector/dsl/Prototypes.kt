@@ -40,7 +40,7 @@ sealed class AmqpConnectorConfigPrototype<C: AmqpConnectorConfig> {
 
 @AmqpConnectorDsl
 class GenericAmqpConnectorConfigPrototype: AmqpConnectorConfigPrototype<GenericAmqpConnectorConfig>() {
-    override fun build(): Outcome<AmqpConfigurationError, GenericAmqpConnectorConfig> = attemptBuildResult {
+    override fun build(): Outcome<AmqpConfigurationError, GenericAmqpConnectorConfig> = composeOutcome {
         val uri = !getValidatedUri(connectionString).mapError { AmqpConfigurationError(it.message) }
 
         Success(
@@ -57,7 +57,7 @@ class ConsumingAmqpConnectorConfigPrototype: AmqpConnectorConfigPrototype<Consum
     val consumerBuilderOutcomes: MutableList<Outcome<AmqpConfigurationError, AmqpConsumer<out Any, out Any>>> =
         mutableListOf()
 
-    override fun build(): Outcome<AmqpConfigurationError, ConsumingAmqpConnectorConfig> = attemptBuildResult {
+    override fun build(): Outcome<AmqpConfigurationError, ConsumingAmqpConnectorConfig> = composeOutcome {
 
         val consumers = !consumerBuilderOutcomes.sequenceToOutcome()
 
@@ -150,7 +150,7 @@ class AmqpConsumerPrototype<T: Any>(
         messageHandler: suspend (AmqpInboundMessage<T>) -> Outcome<AmqpConsumingError, U>,
         payloadSerializer: KSerializer<T>,
         replyPayloadSerializer: KSerializer<U>
-    ): Outcome<AmqpConfigurationError, AmqpConsumer<T, U>> = attemptBuildResult {
+    ): Outcome<AmqpConfigurationError, AmqpConsumer<T, U>> = composeOutcome {
 
         val (messageProcessingCoroutineScope) = messageProcessingCoroutineScope
             ?.let { Success(it) }
@@ -211,7 +211,7 @@ class AmqpPublisherPrototype(
 
     fun build(
         connection: Connection
-    ): Outcome<AmqpConfigurationError, AmqpPublisher> = attemptBuildResult {
+    ): Outcome<AmqpConfigurationError, AmqpPublisher> = composeOutcome {
 
         val (exchangeSpec) = amqpExchangeSpecPrototype.build()
 
