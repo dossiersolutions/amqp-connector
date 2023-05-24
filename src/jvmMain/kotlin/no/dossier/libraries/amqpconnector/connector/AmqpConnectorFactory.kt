@@ -49,7 +49,6 @@ sealed class AmqpConnectorFactory<C: AmqpConnector, S: AmqpConnectorConfig> {
     ): Outcome<AmqpConnectionFactoryError, ConnectionFactory> = try {
         Success(ConnectionFactory().apply {
             setUri(amqpConnectionConfig.connectionURI)
-            virtualHost = "/"
         })
     } catch (e: Exception) {
         Failure(AmqpConnectionFactoryError("Cannot configure connection factory: ${e.message}"))
