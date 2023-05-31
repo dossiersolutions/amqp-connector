@@ -3,7 +3,7 @@ import java.net.URL
 import java.util.Base64
 
 group = "no.dossier.libraries"
-version = "0.1.5"
+version = "0.1.6"
 
 object Meta {
     const val desc = "RabbitMQ Kotlin Client library"

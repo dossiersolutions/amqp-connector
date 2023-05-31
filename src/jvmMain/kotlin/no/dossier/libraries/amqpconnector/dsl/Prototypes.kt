@@ -124,9 +124,9 @@ class AmqpConsumerPrototype<T: Any>(
     var bindingKey: AmqpBindingKey = AmqpBindingKey.Custom("#"),
     var replyingMode: AmqpReplyingMode = AmqpReplyingMode.Never,
     var messageProcessingCoroutineScope: CoroutineScope? = null,
-    var onMessageConsumed: (message: AmqpInboundMessage<T>) -> Unit = { _ -> },
-    var onMessageRejected: (message: AmqpInboundMessage<T>) -> Unit = { _ -> },
-    var onMessageReplyPublished: (message: AmqpOutboundMessage<*>, actualRoutingKey: String) -> Unit = { _, _ -> },
+    var onMessageConsumed: suspend (message: AmqpInboundMessage<T>) -> Unit = { _ -> },
+    var onMessageRejected: suspend (message: AmqpInboundMessage<T>) -> Unit = { _ -> },
+    var onMessageReplyPublished: suspend (message: AmqpOutboundMessage<*>, actualRoutingKey: String) -> Unit = { _, _ -> },
     var autoAckEnabled: Boolean = false,
     var prefetchCount: Int = 5000
 ) {

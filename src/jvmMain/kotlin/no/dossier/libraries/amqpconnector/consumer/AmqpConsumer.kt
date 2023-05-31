@@ -25,9 +25,9 @@ class AmqpConsumer<T : Any, U : Any>(
     private val deadLetterSpec: AmqpDeadLetterSpec,
     private val replyingMode: AmqpReplyingMode,
     private val messageProcessingCoroutineScope: CoroutineScope,
-    private val onMessageConsumed: (message: AmqpInboundMessage<T>) -> Unit,
-    private val onMessageRejected: (message: AmqpInboundMessage<T>) -> Unit,
-    private val onMessageReplyPublished: (message: AmqpOutboundMessage<*>, String) -> Unit,
+    private val onMessageConsumed: suspend (message: AmqpInboundMessage<T>) -> Unit,
+    private val onMessageRejected: suspend (message: AmqpInboundMessage<T>) -> Unit,
+    private val onMessageReplyPublished: suspend (message: AmqpOutboundMessage<*>, String) -> Unit,
     private val autoAckEnabled: Boolean,
     private val prefetchCount: Int,
 ) {
