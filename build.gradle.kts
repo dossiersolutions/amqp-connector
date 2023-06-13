@@ -54,29 +54,42 @@ repositories {
 plugins {
     id("org.gradle.maven-publish")
     id("org.gradle.signing")
-    kotlin("multiplatform") version "1.6.0"
-    id("org.jetbrains.dokka") version "1.6.0"
+    kotlin("multiplatform") version "1.8.22"
+    id("org.jetbrains.dokka") version "1.7.20"
     id("io.github.gradle-nexus.publish-plugin") version "1.1.0"
     kotlin("plugin.serialization") version "1.5.21"
 }
 
 kotlin {
     jvm()
+    linuxX64("native") {
+        binaries {
+            sharedLib {
+                baseName = "native"
+            }
+        }
+    }
     sourceSets {
         val commonMain by existing {
             dependencies {
-                implementation("no.dossier.libraries:functional:0.1.1")
-                implementation("no.dossier.libraries:error-handling:0.1.0")
+                implementation("no.dossier.libraries:functional:0.2.3")
+                implementation("no.dossier.libraries:error-handling:0.1.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.1")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
+                implementation("io.github.microutils:kotlin-logging:2.0.11")
+                implementation("org.jetbrains.kotlin:kotlin-stdlib")
+            }
+        }
+        val nativeMain by existing {
+            dependencies {
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-linuxx64:1.6.4")
             }
         }
         val jvmMain by existing {
             dependencies {
-                implementation("io.github.microutils:kotlin-logging-jvm:2.0.11")
-                implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.1")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.0")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.5.0")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.4")
                 implementation("com.rabbitmq:amqp-client:5.14.0")
+                implementation("io.github.microutils:kotlin-logging-jvm:2.0.11")
             }
         }
         val jvmTest by existing {
@@ -84,6 +97,7 @@ kotlin {
                 implementation("org.junit.jupiter:junit-jupiter-api:5.8.1")
                 implementation("org.junit.jupiter:junit-jupiter-params:5.8.1")
                 runtimeOnly("org.junit.jupiter:junit-jupiter-engine:5.8.1")
+                runtimeOnly("ch.qos.logback:logback-classic:1.2.11")
                 implementation("org.testcontainers:rabbitmq:1.16.2")
                 implementation("org.testcontainers:junit-jupiter:1.16.2")
             }
@@ -130,6 +144,13 @@ tasks {
         archiveAppendix.set("")
         from(dokkaHtml.get())
     }
+    val javadocNativeJar by registering(Jar::class) {
+        group = JavaBasePlugin.DOCUMENTATION_GROUP
+        description = "Assembles Javadoc JAR for Native publication"
+        archiveClassifier.set("javadoc")
+        archiveAppendix.set("native")
+        from(dokkaHtml.get())
+    }
     val javadocJvmJar by registering(Jar::class) {
         group = JavaBasePlugin.DOCUMENTATION_GROUP
         description = "Assembles Javadoc JAR for JVM publication"
@@ -138,7 +159,7 @@ tasks {
         from(dokkaHtml.get())
     }
     val publish by existing {
-        dependsOn(javadocKotlinMultiplatformJar, javadocJvmJar)
+        dependsOn(javadocKotlinMultiplatformJar, javadocJvmJar, javadocNativeJar)
     }
 }
 
@@ -154,6 +175,12 @@ signing {
 
 publishing {
     publications {
+        val native by existing(MavenPublication::class) {
+            artifact(tasks["javadocNativeJar"])
+            pom {
+                commonMetadata()
+            }
+        }
         val jvm by existing(MavenPublication::class) {
             artifact(tasks["javadocJvmJar"])
             pom {

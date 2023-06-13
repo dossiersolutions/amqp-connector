@@ -76,7 +76,8 @@ class SendAndReceiveMessageTest {
         rabbitMQContainer.start()
 
         signalAwaiter = SuspendableSignalAwaiterWithTimeout(
-            timeoutError = AmqpConsumingError("Timeout")
+            timeoutError = AmqpConsumingError("Timeout"),
+            timeoutMillis = 50000
         )
 
         val connectionString = "amqp://${rabbitMQContainer.adminUsername}:${rabbitMQContainer.adminPassword}" +
