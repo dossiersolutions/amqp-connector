@@ -3,8 +3,6 @@ package no.dossier.libraries.amqpconnector.utils
 import kotlinx.coroutines.*
 import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Outcome
-import no.dossier.libraries.functional.Success
-import no.dossier.libraries.functional.andThen
 
 suspend inline fun <E, T> suspendCancellableCoroutineWithTimeout(
     timeoutMillis: Long,

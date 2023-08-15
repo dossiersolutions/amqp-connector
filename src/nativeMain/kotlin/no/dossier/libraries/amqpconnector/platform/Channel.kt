@@ -1,7 +1,7 @@
 package no.dossier.libraries.amqpconnector.platform
 
 import no.dossier.libraries.amqpconnector.primitives.AmqpQueueSpec
-import no.dossier.libraries.amqpconnector.primitives.AmqpReplyProperties
+import no.dossier.libraries.amqpconnector.primitives.AmqpMessageProperties
 
 actual class Channel {
     actual val nextPublishSeqNo: Long
@@ -41,7 +41,7 @@ actual class Channel {
     actual fun basicPublish(
         replyToExchange: String,
         routingKey: String,
-        replyProperties: AmqpReplyProperties,
+        messageProperties: AmqpMessageProperties,
         rawPayload: ByteArray
     ) {
     }
