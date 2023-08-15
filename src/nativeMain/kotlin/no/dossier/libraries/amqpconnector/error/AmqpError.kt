@@ -3,7 +3,6 @@ package no.dossier.libraries.amqpconnector.error
 actual sealed class AmqpError {
     actual abstract val message: String
     actual abstract val causes: Map<String, AmqpError>
-    private val stackTrace: Array<out StackTraceElement> = Thread.currentThread().stackTrace
 
     private fun getErrorTree(levels: List<Boolean> = emptyList()): String = buildString {
         val levelPrefix = levels.joinToString("") { if (it) "│   " else "    " }
@@ -22,22 +21,9 @@ actual sealed class AmqpError {
         }
     }
 
-    private fun getFullStackTrace(): String = buildString {
-        stackTrace.forEach {
-            append("${it}\n")
-        }
-    }
+    private fun getFullStackTrace(): String = "Stacktrace not implemented on native!"
 
-    private fun getMiniStackTrace(): String = buildString {
-        stackTrace.filter {
-            it.className.startsWith("no.dossier.")
-                    && (it.fileName as String) !in listOf("InternalError.kt")
-        }.forEachIndexed { index, it ->
-            val symbol = if (index == 0) "┌" else "│"
-            append("$symbol ${it}\n")
-        }
-    }
+    private fun getMiniStackTrace(): String = "Stacktrace not implemented on native!"
 
-    actual override fun toString(): String =
-        "\n\uD83D\uDD34 " + getErrorTree() + "mini trace:\n" + getMiniStackTrace()
+    actual override fun toString(): String = "\n\uD83D\uDD34 " + getErrorTree() + "mini trace:\n" + getMiniStackTrace()
 }
