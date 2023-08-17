@@ -85,9 +85,11 @@ class AmqpPublisher(
                 AmqpMessageProperty.SEQUENCE_NUMBER.name to sequenceNumber.toString()
             )
 
-            logOutboundMessage(sequenceNumber, message, defaultHeaders, actualRoutingKey)
+            val supplementedMessage = message.copy(headers = message.headers + defaultHeaders)
 
-            submitMessage(message, actualRoutingKey, defaultHeaders)
+            logOutboundMessage(sequenceNumber, supplementedMessage, actualRoutingKey)
+
+            submitMessage(supplementedMessage, actualRoutingKey)
         }
 
 
@@ -101,7 +103,9 @@ class AmqpPublisher(
             AmqpMessageProperty.SEQUENCE_NUMBER.name to sequenceNumber.toString()
         )
 
-        logOutboundMessage(sequenceNumber, message, defaultHeaders, actualRoutingKey)
+        val supplementedMessage = message.copy(headers = message.headers + defaultHeaders)
+
+        logOutboundMessage(sequenceNumber, supplementedMessage, actualRoutingKey)
 
         if (enableConfirmations) {
             no.dossier.libraries.amqpconnector.utils.suspendCancellableCoroutineWithTimeout(
@@ -120,7 +124,7 @@ class AmqpPublisher(
                      * we wouldn't be able to resume the execution.
                      */
                     outstandingConfirms[sequenceNumber] = continuation to message
-                    val result = submitMessage(message, actualRoutingKey, defaultHeaders)
+                    val result = submitMessage(message, actualRoutingKey)
 
                     /* If the submission fails we want to resume right away */
                     if (result is Failure) {
@@ -130,7 +134,7 @@ class AmqpPublisher(
                 }
             )
         } else {
-            val result = submitMessage(message, actualRoutingKey, defaultHeaders)
+            val result = submitMessage(message, actualRoutingKey)
             if (result is Success) {
                 onMessagePublished(message, actualRoutingKey)
             }
@@ -141,12 +145,11 @@ class AmqpPublisher(
     private fun <T : Any> logOutboundMessage(
         sequenceNumber: Long,
         message: AmqpOutboundMessage<T>,
-        defaultHeaders: Map<String, String>,
         actualRoutingKey: String
     ) {
         logger.debug {
             val sequenceNumberInfo = if (enableConfirmations) "(sequence number [$sequenceNumber]) " else ""
-            val messageHeaders = message.headers.entries.joinToString() + defaultHeaders.entries.joinToString()
+            val messageHeaders = message.headers.entries.joinToString()
 
             "← \uD83D\uDCE8 AMQP Publisher - sending message $sequenceNumberInfo" +
                     "to [${exchangeSpec.name}] using routing key [$actualRoutingKey], headers: [$messageHeaders]"
@@ -155,8 +158,7 @@ class AmqpPublisher(
 
     private fun <T> submitMessage(
         message: AmqpOutboundMessage<T>,
-        routingKey: String,
-        defaultHeaders: Map<String, String>
+        routingKey: String
     ): Outcome<AmqpPublishingError, Unit> =
         serializePayload(message)
             .andThen { serializedPayload ->
@@ -168,7 +170,7 @@ class AmqpPublisher(
                 }, {
                     val amqpMessageProperties = messageProperties {
                         deliveryMode = message.deliveryMode
-                        headers = (message.headers + defaultHeaders).toMutableMap()
+                        headers = message.headers.toMutableMap()
 
                         message.replyTo?.let { replyTo = it }
                         message.correlationId?.let { correlationId = it }
