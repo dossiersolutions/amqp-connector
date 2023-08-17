@@ -10,9 +10,9 @@ import no.dossier.libraries.functional.Success
 
 /* TODO: Reconsider Headers vs Properties naming, maybe there shouldn't be any pre-defined set of Properties at all */
 enum class AmqpMessageProperty {
-    USER,
-    API_KEY,
-    REPLY_TO_EXCHANGE
+    REPLY_TO_EXCHANGE,
+    PUBLISHED_TIMESTAMP,
+    SEQUENCE_NUMBER
 }
 
 enum class AmqpMessageDeliveryMode(val code: Int) {
@@ -32,7 +32,8 @@ data class AmqpInboundMessage<T>(
     val replyTo: String? = null,
     val correlationId: String? = null,
     val routingKey: String,
-    private val serializer: KSerializer<T>
+    private val serializer: KSerializer<T>,
+    val deliveryTag: Long
 ) {
     val payload: Outcome<AmqpConsumingError ,T> by lazy {
         try {
@@ -87,6 +88,7 @@ data class AmqpInboundMessage<T>(
           headers = $headers
           replyTo = $replyTo, correlationId = $correlationId
           rawPayload = ${rawPayload.decodeToString()}
+          deliveryTag = $deliveryTag
         )
     """.trimIndent()
 }
@@ -95,7 +97,6 @@ data class AmqpInboundMessage<T>(
 * We need this inline factory method because inline constructors are not yet supported in Kotlin
 * see https://youtrack.jetbrains.com/issue/KT-30915
 */
-@Suppress("FunctionName")
 inline fun <reified T> AmqpOutboundMessage(
     payload: T,
     headers: Map<String, String> = mapOf(),

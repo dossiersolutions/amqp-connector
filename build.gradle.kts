@@ -1,3 +1,4 @@
+import io.github.gradlenexus.publishplugin.NexusRepositoryContainer
 import org.jetbrains.dokka.gradle.DokkaTaskPartial
 import java.net.URL
 import java.util.Base64
@@ -54,7 +55,7 @@ repositories {
 plugins {
     id("org.gradle.maven-publish")
     id("org.gradle.signing")
-    kotlin("multiplatform") version "1.8.22"
+    kotlin("multiplatform") version "1.9.0"
     id("org.jetbrains.dokka") version "1.7.20"
     id("io.github.gradle-nexus.publish-plugin") version "1.1.0"
     kotlin("plugin.serialization") version "1.5.21"

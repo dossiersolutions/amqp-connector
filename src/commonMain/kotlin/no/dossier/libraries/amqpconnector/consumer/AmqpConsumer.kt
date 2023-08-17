@@ -3,7 +3,7 @@ package no.dossier.libraries.amqpconnector.consumer
 import kotlinx.coroutines.*
 import kotlinx.serialization.KSerializer
 import mu.KotlinLogging
-import no.dossier.libraries.amqpconnector.dsl.replyProperties
+import no.dossier.libraries.amqpconnector.dsl.messageProperties
 import no.dossier.libraries.amqpconnector.error.AmqpConfigurationError
 import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
 import no.dossier.libraries.amqpconnector.platform.Channel
@@ -179,7 +179,8 @@ class AmqpConsumer<T : Any, U : Any>(
                     replyTo = delivery.properties.replyTo,
                     correlationId = delivery.properties.correlationId,
                     routingKey = delivery.envelope.routingKey,
-                    serializer = serializer
+                    serializer = serializer,
+                    deliveryTag = delivery.envelope.deliveryTag
                 ))
             }
         } catch (e: Exception) {
@@ -264,7 +265,7 @@ class AmqpConsumer<T : Any, U : Any>(
                     }
                 }
                 if (!autoAckEnabled) {
-                    logger.debug { "Sending ACK" }
+                    logger.debug { "Sending ACK for deliveryTag: ${message.deliveryTag}" }
                     message.acknowledge()
                 }
                 onMessageConsumed(message)
@@ -272,14 +273,16 @@ class AmqpConsumer<T : Any, U : Any>(
             is Failure -> {
                 if (!autoAckEnabled) {
                     logger.warn {
-                        "Message processing finished with Failure, dispatching REJECT\n" +
+                        "Message processing finished with Failure, " +
+                                "dispatching REJECT for deliveryTag: ${message.deliveryTag}\n" +
                                 result.error.toString()
                     }
                     message.reject()
                 }
                 else {
                     logger.warn {
-                        "Message processing finished with Failure (but auto-acknowledging is enabled)\n" +
+                        "Message processing finished with Failure (but auto-acknowledging is enabled)" +
+                                ", deliveryTag: ${message.deliveryTag}\n" +
                                 result.error.toString()
                     }
                 }
@@ -311,7 +314,7 @@ class AmqpConsumer<T : Any, U : Any>(
                 }
 
                 try {
-                    val replyProperties = replyProperties {
+                    val replyProperties = messageProperties {
                         correlationId = message.correlationId
                         deliveryMode = AmqpMessageDeliveryMode.PERSISTENT
                     }
@@ -333,7 +336,7 @@ class AmqpConsumer<T : Any, U : Any>(
         /* Acknowledge and Reject callbacks are dispatched back to the AMQP client consumer thread pool */
         withContext(consumerThreadPoolDispatcher) {
             val operationName = if (acknowledge) "ACK" else "REJECT"
-            logger.debug { "AMQP Consumer - sending $operationName" }
+            logger.debug { "AMQP Consumer - sending $operationName for deliveryTag: ($deliveryTag)" }
 
             try {
                 /* We can currently only acknowledge 1 message at time because we use multiple threads.

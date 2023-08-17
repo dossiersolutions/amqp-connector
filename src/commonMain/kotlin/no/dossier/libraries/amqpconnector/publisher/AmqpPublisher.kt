@@ -3,16 +3,14 @@ package no.dossier.libraries.amqpconnector.publisher
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
-import no.dossier.libraries.amqpconnector.dsl.replyProperties
+import no.dossier.libraries.amqpconnector.dsl.messageProperties
 import no.dossier.libraries.amqpconnector.error.AmqpConfigurationError
 import no.dossier.libraries.amqpconnector.error.AmqpPublishingError
 import no.dossier.libraries.amqpconnector.platform.Channel
 import no.dossier.libraries.amqpconnector.platform.Connection
 import no.dossier.libraries.amqpconnector.platform.OutstandingConfirms
-import no.dossier.libraries.amqpconnector.primitives.AmqpExchangeSpec
-import no.dossier.libraries.amqpconnector.primitives.AmqpExchangeType
-import no.dossier.libraries.amqpconnector.primitives.AmqpOutboundMessage
-import no.dossier.libraries.amqpconnector.primitives.AmqpRoutingKey
+import no.dossier.libraries.amqpconnector.primitives.*
+import no.dossier.libraries.amqpconnector.utils.getCurrentTimeStamp
 import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Outcome
 import no.dossier.libraries.functional.Success
@@ -31,7 +29,7 @@ class AmqpPublisher(
 
     private val outstandingConfirms: OutstandingConfirms = OutstandingConfirms()
 
-    private lateinit var amqpChannel: Channel
+    private val amqpChannel: Channel = publishingConnection.createChannel()
 
     init {
         runBlocking {
@@ -40,8 +38,6 @@ class AmqpPublisher(
                     "Creating new AMQP publisher publishing to [${exchangeSpec.name}] " +
                             "exchange using default routing key [$routingKey]"
                 }
-
-                amqpChannel = publishingConnection.createChannel()
 
                 if (exchangeSpec.type != AmqpExchangeType.DEFAULT)
                     amqpChannel.exchangeDeclare(
@@ -82,14 +78,18 @@ class AmqpPublisher(
         }
         else {
             val actualRoutingKey = getActualRoutingKey(message.routingKey)
-            val messageHeaders = message.headers.entries.joinToString()
+            val sequenceNumber = amqpChannel.nextPublishSeqNo
 
-            logger.debug {
-                "← \uD83D\uDCE8 AMQP Publisher - sending message " +
-                        "to [${exchangeSpec.name}] using routing key [$actualRoutingKey], headers: [$messageHeaders]"
-            }
+            val defaultHeaders: Map<String, String> = mapOf(
+                AmqpMessageProperty.PUBLISHED_TIMESTAMP.name to getCurrentTimeStamp(),
+                AmqpMessageProperty.SEQUENCE_NUMBER.name to sequenceNumber.toString()
+            )
 
-            submitMessage(message, actualRoutingKey)
+            val supplementedMessage = message.copy(headers = message.headers + defaultHeaders)
+
+            logOutboundMessage(sequenceNumber, supplementedMessage, actualRoutingKey)
+
+            submitMessage(supplementedMessage, actualRoutingKey)
         }
 
 
@@ -98,14 +98,14 @@ class AmqpPublisher(
     ): Outcome<AmqpPublishingError, Unit> = withContext(threadPoolDispatcher) {
         val sequenceNumber = amqpChannel.nextPublishSeqNo
         val actualRoutingKey = getActualRoutingKey(message.routingKey)
+        val defaultHeaders: Map<String, String> = mapOf(
+            AmqpMessageProperty.PUBLISHED_TIMESTAMP.name to getCurrentTimeStamp(),
+            AmqpMessageProperty.SEQUENCE_NUMBER.name to sequenceNumber.toString()
+        )
 
-        logger.debug {
-            val sequenceNumberInfo = if (enableConfirmations) "(sequence number [$sequenceNumber]) " else ""
-            val messageHeaders = message.headers.entries.joinToString()
+        val supplementedMessage = message.copy(headers = message.headers + defaultHeaders)
 
-            "← \uD83D\uDCE8 AMQP Publisher - sending message $sequenceNumberInfo" +
-                    "to [${exchangeSpec.name}] using routing key [$actualRoutingKey], headers: [$messageHeaders]"
-        }
+        logOutboundMessage(sequenceNumber, supplementedMessage, actualRoutingKey)
 
         if (enableConfirmations) {
             no.dossier.libraries.amqpconnector.utils.suspendCancellableCoroutineWithTimeout(
@@ -142,6 +142,20 @@ class AmqpPublisher(
         }
     }
 
+    private fun <T : Any> logOutboundMessage(
+        sequenceNumber: Long,
+        message: AmqpOutboundMessage<T>,
+        actualRoutingKey: String
+    ) {
+        logger.debug {
+            val sequenceNumberInfo = if (enableConfirmations) "(sequence number [$sequenceNumber]) " else ""
+            val messageHeaders = message.headers.entries.joinToString()
+
+            "← \uD83D\uDCE8 AMQP Publisher - sending message $sequenceNumberInfo" +
+                    "to [${exchangeSpec.name}] using routing key [$actualRoutingKey], headers: [$messageHeaders]"
+        }
+    }
+
     private fun <T> submitMessage(
         message: AmqpOutboundMessage<T>,
         routingKey: String
@@ -154,7 +168,7 @@ class AmqpPublisher(
                         amqpMessage = message
                     )
                 }, {
-                    val amqpReplyProperties = replyProperties {
+                    val amqpMessageProperties = messageProperties {
                         deliveryMode = message.deliveryMode
                         headers = message.headers.toMutableMap()
 
@@ -165,7 +179,7 @@ class AmqpPublisher(
                     amqpChannel.basicPublish(
                         exchangeSpec.name,
                         routingKey,
-                        amqpReplyProperties,
+                        amqpMessageProperties,
                         serializedPayload
                     )
                 })

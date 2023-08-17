@@ -13,7 +13,7 @@ import no.dossier.libraries.amqpconnector.consumer.AmqpReplyingMode
 import no.dossier.libraries.amqpconnector.error.AmqpConfigurationError
 import no.dossier.libraries.amqpconnector.error.AmqpConsumingError
 import no.dossier.libraries.amqpconnector.platform.Connection
-import no.dossier.libraries.amqpconnector.primitives.AmqpReplyProperties
+import no.dossier.libraries.amqpconnector.primitives.AmqpMessageProperties
 import no.dossier.libraries.amqpconnector.primitives.*
 import no.dossier.libraries.amqpconnector.publisher.AmqpPublisher
 import no.dossier.libraries.amqpconnector.rpc.AmqpRpcClient
@@ -300,7 +300,7 @@ class AmqpRpcClientPrototype<U: Any>(
 }
 
 @AmqpConnectorDsl
-class AmqpReplyPropertiesPrototype(
+class AmqpMessagePropertiesPrototype(
     var correlationId: String? = null,
     var deliveryMode: AmqpMessageDeliveryMode = AmqpMessageDeliveryMode.TRANSIENT,
     var replyTo: String? = null,
@@ -311,8 +311,8 @@ class AmqpReplyPropertiesPrototype(
         headers[name] = value
     }
 
-    fun build(): AmqpReplyProperties =
-        AmqpReplyProperties(
+    fun build(): AmqpMessageProperties =
+        AmqpMessageProperties(
             correlationId,
             deliveryMode,
             replyTo,

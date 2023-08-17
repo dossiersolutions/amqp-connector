@@ -3,7 +3,7 @@ package no.dossier.libraries.amqpconnector.platform
 import com.rabbitmq.client.AMQP
 import com.rabbitmq.client.Channel
 import no.dossier.libraries.amqpconnector.primitives.AmqpQueueSpec
-import no.dossier.libraries.amqpconnector.primitives.AmqpReplyProperties
+import no.dossier.libraries.amqpconnector.primitives.AmqpMessageProperties
 
 actual class Channel(private val rmqChannel: Channel) {
 
@@ -56,13 +56,13 @@ actual class Channel(private val rmqChannel: Channel) {
     actual fun basicPublish(
         replyToExchange: String,
         routingKey: String,
-        replyProperties: AmqpReplyProperties,
+        messageProperties: AmqpMessageProperties,
         rawPayload: ByteArray
     ) {
-        rmqChannel.basicPublish(replyToExchange, routingKey, buildProperties(replyProperties), rawPayload)
+        rmqChannel.basicPublish(replyToExchange, routingKey, buildProperties(messageProperties), rawPayload)
     }
 
-    private fun buildProperties(replyProperties: AmqpReplyProperties): AMQP.BasicProperties? {
+    private fun buildProperties(replyProperties: AmqpMessageProperties): AMQP.BasicProperties? {
         val amqpPropertiesBuilder = AMQP.BasicProperties().builder()
             .deliveryMode(replyProperties.deliveryMode.code)
             .headers(replyProperties.headers as Map<String, Any>?)

@@ -1,8 +1,8 @@
 package no.dossier.libraries.amqpconnector.dsl
 
-import no.dossier.libraries.amqpconnector.primitives.AmqpReplyProperties
+import no.dossier.libraries.amqpconnector.primitives.AmqpMessageProperties
 
-fun replyProperties(builderBlock: AmqpReplyPropertiesPrototype.() -> Unit): AmqpReplyProperties =
-    AmqpReplyPropertiesPrototype()
+fun messageProperties(builderBlock: AmqpMessagePropertiesPrototype.() -> Unit): AmqpMessageProperties =
+    AmqpMessagePropertiesPrototype()
         .apply(builderBlock)
         .build()
