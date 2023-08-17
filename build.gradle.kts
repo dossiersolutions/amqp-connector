@@ -56,13 +56,14 @@ plugins {
     id("org.gradle.maven-publish")
     id("org.gradle.signing")
     kotlin("multiplatform") version "1.9.0"
-    id("org.jetbrains.dokka") version "1.7.20"
+    id("org.jetbrains.dokka") version "1.8.20"
     id("io.github.gradle-nexus.publish-plugin") version "1.1.0"
     kotlin("plugin.serialization") version "1.5.21"
 }
 
 kotlin {
     jvm()
+    js() //just temporary WKA to make dokka working, see https://github.com/Kotlin/dokka/issues/3122
     /*linuxX64("native") {
         binaries {
             sharedLib {
