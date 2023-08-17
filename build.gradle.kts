@@ -63,13 +63,13 @@ plugins {
 
 kotlin {
     jvm()
-    linuxX64("native") {
+    /*linuxX64("native") {
         binaries {
             sharedLib {
                 baseName = "native"
             }
         }
-    }
+    }*/
     sourceSets {
         val commonMain by existing {
             dependencies {
@@ -81,11 +81,11 @@ kotlin {
                 implementation("org.jetbrains.kotlin:kotlin-stdlib")
             }
         }
-        val nativeMain by existing {
+        /*val nativeMain by existing {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-linuxx64:1.6.4")
             }
-        }
+        }*/
         val jvmMain by existing {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.4")
@@ -145,13 +145,13 @@ tasks {
         archiveAppendix.set("")
         from(dokkaHtml.get())
     }
-    val javadocNativeJar by registering(Jar::class) {
+    /*val javadocNativeJar by registering(Jar::class) {
         group = JavaBasePlugin.DOCUMENTATION_GROUP
         description = "Assembles Javadoc JAR for Native publication"
         archiveClassifier.set("javadoc")
         archiveAppendix.set("native")
         from(dokkaHtml.get())
-    }
+    }*/
     val javadocJvmJar by registering(Jar::class) {
         group = JavaBasePlugin.DOCUMENTATION_GROUP
         description = "Assembles Javadoc JAR for JVM publication"
@@ -160,7 +160,7 @@ tasks {
         from(dokkaHtml.get())
     }
     val publish by existing {
-        dependsOn(javadocKotlinMultiplatformJar, javadocJvmJar, javadocNativeJar)
+        dependsOn(javadocKotlinMultiplatformJar, javadocJvmJar/*, javadocNativeJar*/)
     }
 }
 
@@ -176,12 +176,12 @@ signing {
 
 publishing {
     publications {
-        val native by existing(MavenPublication::class) {
+        /*val native by existing(MavenPublication::class) {
             artifact(tasks["javadocNativeJar"])
             pom {
                 commonMetadata()
             }
-        }
+        }*/
         val jvm by existing(MavenPublication::class) {
             artifact(tasks["javadocJvmJar"])
             pom {
