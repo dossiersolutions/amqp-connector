@@ -1,5 +1,4 @@
-import io.github.gradlenexus.publishplugin.NexusRepositoryContainer
-import org.jetbrains.dokka.gradle.DokkaTaskPartial
+//import org.jetbrains.dokka.gradle.DokkaTaskPartial
 import java.net.URL
 import java.util.Base64
 
@@ -56,14 +55,13 @@ plugins {
     id("org.gradle.maven-publish")
     id("org.gradle.signing")
     kotlin("multiplatform") version "1.9.0"
-    id("org.jetbrains.dokka") version "1.8.20"
+    //id("org.jetbrains.dokka") version "1.8.20"
     id("io.github.gradle-nexus.publish-plugin") version "1.1.0"
     kotlin("plugin.serialization") version "1.5.21"
 }
 
 kotlin {
     jvm()
-    js() //just temporary WKA to make dokka working, see https://github.com/Kotlin/dokka/issues/3122
     /*linuxX64("native") {
         binaries {
             sharedLib {
@@ -115,7 +113,7 @@ tasks {
     withType<Test> {
         useJUnitPlatform()
     }
-    withType<DokkaTaskPartial>().configureEach {
+    /*withType<DokkaTaskPartial>().configureEach {
         dokkaSourceSets {
             removeIf { it.name == "jvmDoc" }
             named("jvmMain") {
@@ -138,14 +136,14 @@ tasks {
             }
         }
     }
-    val dokkaHtml by existing
-    val javadocKotlinMultiplatformJar by registering(Jar::class) {
+    val dokkaHtml by existing*/
+    /*val javadocKotlinMultiplatformJar by registering(Jar::class) {
         group = JavaBasePlugin.DOCUMENTATION_GROUP
         description = "Assembles Javadoc JAR for KotlinMultiplatform publication"
         archiveClassifier.set("javadoc")
         archiveAppendix.set("")
         from(dokkaHtml.get())
-    }
+    }*/
     /*val javadocNativeJar by registering(Jar::class) {
         group = JavaBasePlugin.DOCUMENTATION_GROUP
         description = "Assembles Javadoc JAR for Native publication"
@@ -153,7 +151,7 @@ tasks {
         archiveAppendix.set("native")
         from(dokkaHtml.get())
     }*/
-    val javadocJvmJar by registering(Jar::class) {
+   /* val javadocJvmJar by registering(Jar::class) {
         group = JavaBasePlugin.DOCUMENTATION_GROUP
         description = "Assembles Javadoc JAR for JVM publication"
         archiveClassifier.set("javadoc")
@@ -162,7 +160,7 @@ tasks {
     }
     val publish by existing {
         dependsOn(javadocKotlinMultiplatformJar, javadocJvmJar/*, javadocNativeJar*/)
-    }
+    }*/
 }
 
 signing {
@@ -184,13 +182,13 @@ publishing {
             }
         }*/
         val jvm by existing(MavenPublication::class) {
-            artifact(tasks["javadocJvmJar"])
+            //artifact(tasks["javadocJvmJar"])
             pom {
                 commonMetadata()
             }
         }
         val kotlinMultiplatform by existing(MavenPublication::class) {
-            artifact(tasks["javadocKotlinMultiplatformJar"])
+            //artifact(tasks["javadocKotlinMultiplatformJar"])
             pom {
                 commonMetadata()
             }
