@@ -78,7 +78,7 @@ actual class Channel(private val rmqChannel: Channel) {
     }
 
     actual fun basicReject(deliveryTag: Long, requeue: Boolean) {
-        basicReject(deliveryTag, requeue)
+        rmqChannel.basicReject(deliveryTag, requeue)
     }
 
     actual fun confirmSelect() {
