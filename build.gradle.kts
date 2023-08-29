@@ -177,7 +177,7 @@ publishing {
     repositories {
         maven {
             name = "DossierNexus"
-            url = uri("https://devsrv.dossier.no/nexus/repository/maven-public/")
+            url = uri("https://devsrv.dossier.no/nexus/repository/maven-releases/")
             credentials {
                 // Read nexus username and password from env (CI) or ~/.gradle/gradle.properties
                 username = System.getenv("MAVEN_REPO_USERNAME") ?: project.property("nexusUsername")!!.toString()
