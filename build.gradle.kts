@@ -174,6 +174,21 @@ signing {
 
 
 publishing {
+    repositories {
+        maven {
+            name = "DossierNexus"
+            url = uri("https://devsrv.dossier.no/nexus/repository/maven-public/")
+            credentials {
+                // Read nexus username and password from env (CI) or ~/.gradle/gradle.properties
+                username = System.getenv("MAVEN_REPO_USERNAME") ?: project.property("nexusUsername")!!.toString()
+                password = System.getenv("MAVEN_REPO_PASSWORD") ?: project.property("nexusPassword")!!.toString()
+            }
+            metadataSources {
+                mavenPom()
+                artifact()
+            }
+        }
+    }
     publications {
         val native by existing(MavenPublication::class) {
             artifact(tasks["javadocNativeJar"])
@@ -198,6 +213,7 @@ publishing {
 
 nexusPublishing {
     repositories {
+
         sonatype {
             nexusUrl.set(uri(Meta.releaseRepoUrl))
             snapshotRepositoryUrl.set(uri(Meta.snapshotRepoUrl))
