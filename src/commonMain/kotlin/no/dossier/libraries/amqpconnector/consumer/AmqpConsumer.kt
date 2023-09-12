@@ -13,6 +13,7 @@ import no.dossier.libraries.amqpconnector.primitives.*
 import no.dossier.libraries.functional.Failure
 import no.dossier.libraries.functional.Outcome
 import no.dossier.libraries.functional.Success
+import kotlin.jvm.Synchronized
 
 class AmqpConsumer<T : Any, U : Any>(
     private val exchangeSpec: AmqpExchangeSpec,
@@ -195,9 +196,14 @@ class AmqpConsumer<T : Any, U : Any>(
             && amqpChannel != null
             && actualMainQueueName != null
         ) {
-            amqpChannel!!.basicCancel(tag!!)
-            tag = null
-            Success(Unit)
+            try {
+                amqpChannel!!.basicCancel(tag!!)
+                tag = null
+                Success(Unit)
+            }
+            catch (t: Throwable) {
+                Failure(AmqpConfigurationError("Unable to pause consumer, $t"))
+            }
         } else {
             Failure(AmqpConfigurationError("Unable to pause consumer, it isn't running"))
         }
@@ -210,11 +216,16 @@ class AmqpConsumer<T : Any, U : Any>(
             && amqpChannel != null
             && actualMainQueueName != null
         ) {
-            tag = amqpChannel!!.basicConsume(
-                actualMainQueueName!!, autoAckEnabled,
-                getDeliverCallback(consumerThreadPoolDispatcher!!, amqpChannel!!)
-            ) { _ -> }
-            Success(Unit)
+            try {
+                tag = amqpChannel!!.basicConsume(
+                    actualMainQueueName!!, autoAckEnabled,
+                    getDeliverCallback(consumerThreadPoolDispatcher!!, amqpChannel!!)
+                ) { _ -> }
+                Success(Unit)
+            }
+            catch (t: Throwable) {
+                Failure(AmqpConfigurationError("Unable to unpause consumer, $t"))
+            }
         } else {
             Failure(AmqpConfigurationError("Unable to unpause consumer, it isn't paused"))
         }

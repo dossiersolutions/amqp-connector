@@ -17,6 +17,7 @@ import no.dossier.libraries.amqpconnector.publisher.AmqpPublisher
 import no.dossier.libraries.amqpconnector.utils.getValidatedUUID
 import no.dossier.libraries.amqpconnector.utils.suspendCancellableCoroutineWithTimeout
 import kotlin.coroutines.resume
+import kotlin.random.Random
 
 class AmqpRpcClient<U: Any>(
     private val responsePayloadSerializer: KSerializer<U>,
@@ -35,7 +36,8 @@ class AmqpRpcClient<U: Any>(
     private val onReplyConsumed: (message: AmqpInboundMessage<U>) -> Unit,
     private val onReplyRejected: (message: AmqpInboundMessage<U>) -> Unit,
     private val onRequestPublished: (message: AmqpOutboundMessage<*>, actualRoutingKey: String) -> Unit,
-    private val consumerPrefetchCount: Int
+    private val consumerPrefetchCount: Int,
+    private val replyQueueSpec: AmqpQueueSpec,
 ) {
     @PublishedApi
     internal val logger = KotlinLogging.logger { }
@@ -89,12 +91,10 @@ class AmqpRpcClient<U: Any>(
     }
 
     init {
-        val queueSpec = AmqpQueueSpec(
-            name = "", // Empty string means that the name will be assigned by the brokerExecutorCoroutineDispatcher
-            durable = false,
-            exclusive = true,
-            autoDelete = true
+        val refinedReplyQueueSpec = replyQueueSpec.copy(
+            name = if (replyQueueSpec.name != "") replyQueueSpec.name else "rpc-client-${Uuid.random()}"
         )
+
 
         val deadLetterSpec = AmqpDeadLetterSpec(
             enabled = false, // Since the dead letter forwarding is disabled, the below arguments are not relevant
@@ -109,7 +109,7 @@ class AmqpRpcClient<U: Any>(
             responseMessageHandler,
             responsePayloadSerializer,
             serializer(),
-            queueSpec,
+            refinedReplyQueueSpec,
             deadLetterSpec,
             AmqpReplyingMode.Never,
             messageProcessingCoroutineScope,

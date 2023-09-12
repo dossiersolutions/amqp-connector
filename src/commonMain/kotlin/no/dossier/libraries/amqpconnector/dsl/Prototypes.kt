@@ -239,6 +239,8 @@ class AmqpRpcClientPrototype<U: Any>(
     var onRequestPublished: (message: AmqpOutboundMessage<*>, actualRoutingKey: String) -> Unit = { _, _ -> },
     var prefetchCount: Int = 5000
 ) {
+    private val amqpQueueSpecPrototype = AmqpQueueSpecPrototype()
+
     private val amqpExchangeSpecPrototype = AmqpExchangeSpecPrototype().apply {
         type = AmqpExchangeType.DEFAULT // overridden default value
     }
@@ -255,6 +257,10 @@ class AmqpRpcClientPrototype<U: Any>(
         amqpReplyToExchangeSpecPrototype.apply(builder)
     }
 
+    fun replyQueue(builder: AmqpQueueSpecPrototype.() -> Unit) {
+        amqpQueueSpecPrototype.apply(builder)
+    }
+
     fun build(
         consumingConnection: Connection,
         publishingConnection: Connection,
@@ -263,6 +269,7 @@ class AmqpRpcClientPrototype<U: Any>(
 
         val (exchangeSpec) = amqpExchangeSpecPrototype.build()
         val (replyToExchangeSpec) = amqpReplyToExchangeSpecPrototype.build()
+        val (replyQueueSpec) = amqpQueueSpecPrototype.build()
 
         if ((replyToExchangeSpec.name == "" && replyToExchangeSpec.type != AmqpExchangeType.DEFAULT)
             || (replyToExchangeSpec.name != "" && replyToExchangeSpec.type !in setOf(AmqpExchangeType.DIRECT, AmqpExchangeType.TOPIC))) {
@@ -293,7 +300,8 @@ class AmqpRpcClientPrototype<U: Any>(
                 onReplyConsumed,
                 onReplyRejected,
                 onRequestPublished,
-                prefetchCount
+                prefetchCount,
+                replyQueueSpec
             )
         )
     }
