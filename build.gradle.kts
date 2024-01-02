@@ -3,7 +3,7 @@ import java.net.URL
 import java.util.Base64
 
 group = "no.dossier.libraries"
-version = "0.2.2"
+version = "0.2.3"
 
 object Meta {
     const val desc = "RabbitMQ Kotlin Client library"
@@ -88,7 +88,7 @@ kotlin {
         val jvmMain by existing {
             dependencies {
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.4")
-                implementation("com.rabbitmq:amqp-client:5.14.0")
+                implementation("com.rabbitmq:amqp-client:5.20.0")
                 implementation("io.github.microutils:kotlin-logging-jvm:2.0.11")
             }
         }
