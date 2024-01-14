@@ -3,7 +3,7 @@ import java.net.URL
 import java.util.Base64
 
 group = "no.dossier.libraries"
-version = "0.2.4"
+version = "0.2.5"
 
 object Meta {
     const val desc = "RabbitMQ Kotlin Client library"
@@ -54,8 +54,8 @@ repositories {
 plugins {
     id("org.gradle.maven-publish")
     id("org.gradle.signing")
-    kotlin("multiplatform") version "1.9.0"
-    id("org.jetbrains.dokka") version "1.8.20"
+    kotlin("multiplatform") version "1.9.20"
+    id("org.jetbrains.dokka") version "1.9.10"
     id("io.github.gradle-nexus.publish-plugin") version "1.1.0"
     kotlin("plugin.serialization") version "1.5.21"
 }
@@ -72,10 +72,10 @@ kotlin {
     sourceSets {
         val commonMain by existing {
             dependencies {
-                implementation("no.dossier.libraries:functional:0.2.3")
+                implementation("no.dossier.libraries:functional:0.2.4")
                 implementation("no.dossier.libraries:error-handling:0.1.2")
-                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.1")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4")
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
                 implementation("io.github.microutils:kotlin-logging:2.0.11")
                 implementation("org.jetbrains.kotlin:kotlin-stdlib")
             }
@@ -87,7 +87,7 @@ kotlin {
         }*/
         val jvmMain by existing {
             dependencies {
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.6.4")
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.7.3")
                 implementation("com.rabbitmq:amqp-client:5.20.0")
                 implementation("io.github.microutils:kotlin-logging-jvm:2.0.11")
             }
