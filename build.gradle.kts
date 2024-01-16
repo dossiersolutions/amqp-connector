@@ -57,7 +57,7 @@ plugins {
     kotlin("multiplatform") version "1.9.20"
     id("org.jetbrains.dokka") version "1.9.10"
     id("io.github.gradle-nexus.publish-plugin") version "1.1.0"
-    kotlin("plugin.serialization") version "1.5.21"
+    kotlin("plugin.serialization") version "1.9.20"
 }
 
 kotlin {
