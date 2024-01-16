@@ -1,9 +1,10 @@
 import org.jetbrains.dokka.gradle.DokkaTaskPartial
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.net.URL
 import java.util.Base64
 
 group = "no.dossier.libraries"
-version = "0.2.6"
+version = "0.2.7"
 
 object Meta {
     const val desc = "RabbitMQ Kotlin Client library"
@@ -62,13 +63,13 @@ plugins {
 
 kotlin {
     jvm()
-    linuxX64("native") {
+    /*linuxX64("native") {
         binaries {
             sharedLib {
                 baseName = "native"
             }
         }
-    }
+    }*/
     sourceSets {
         val commonMain by existing {
             dependencies {
@@ -113,6 +114,7 @@ tasks {
     withType<Test> {
         useJUnitPlatform()
     }
+    withType<KotlinCompile> { kotlinOptions.jvmTarget = "21" }
     withType<DokkaTaskPartial>().configureEach {
         dokkaSourceSets {
             removeIf { it.name == "jvmDoc" }
@@ -144,13 +146,13 @@ tasks {
         archiveAppendix.set("")
         from(dokkaHtml.get())
     }
-    val javadocNativeJar by registering(Jar::class) {
+    /*val javadocNativeJar by registering(Jar::class) {
         group = JavaBasePlugin.DOCUMENTATION_GROUP
         description = "Assembles Javadoc JAR for Native publication"
         archiveClassifier.set("javadoc")
         archiveAppendix.set("native")
         from(dokkaHtml.get())
-    }
+    }*/
     val javadocJvmJar by registering(Jar::class) {
         group = JavaBasePlugin.DOCUMENTATION_GROUP
         description = "Assembles Javadoc JAR for JVM publication"
@@ -190,12 +192,12 @@ publishing {
         }
     }
     publications {
-        val native by existing(MavenPublication::class) {
+        /*val native by existing(MavenPublication::class) {
             artifact(tasks["javadocNativeJar"])
             pom {
                 commonMetadata()
             }
-        }
+        }*/
         val jvm by existing(MavenPublication::class) {
             artifact(tasks["javadocJvmJar"])
             pom {
