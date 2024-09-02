@@ -106,7 +106,7 @@ fun <C, S, F: AmqpConnectorFactory<C, S>, P: AmqpConnectorConfigPrototype<S>, R:
 ): C = role.connectorConfigPrototypeCtor()
     .apply(builderBlock).build()
     .andThen { configuration -> role.connectorFactory.create(configuration) }
-    .forceGet()
+    .unwrap()
 
 /**
  * Defines new [AmqpConsumer] within the scope of [AmqpConnector]. Consumers defined this way are
@@ -139,7 +139,7 @@ inline fun <reified T: Any, reified U: Any> ConsumingAmqpConnectorConfigPrototyp
         .apply(builderBlock).build(messageHandler, serializer(), serializer())
 
     consumerBuilderOutcomes += consumer
-    return consumer.forceGet()
+    return consumer.unwrap()
 }
 
 /**
@@ -167,7 +167,7 @@ fun PublishingAmqpConnector.publisher(
 ): AmqpPublisher =
     AmqpPublisherPrototype()
         .apply(builderBlock).build(publishingConnection)
-        .forceGet()
+        .unwrap()
 
 /**
  * Defines new [AmqpRpcClient] within the scope of [AmqpConnector].
@@ -192,4 +192,4 @@ inline fun <reified U: Any> PublishingConsumingAmqpConnectorImpl.rpcClient(
     AmqpRpcClientPrototype<U>()
         .apply(builderBlock)
         .build(consumingConnection, publishingConnection, serializer())
-        .forceGet()
+        .unwrap()

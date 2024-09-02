@@ -7,4 +7,5 @@ expect class Connection {
 
     fun close(): Unit
     fun createChannel(): Channel
+    fun isOpen(): Boolean
 }

@@ -8,6 +8,7 @@ import no.dossier.libraries.functional.runCatching
 sealed interface AmqpConnector {
     val amqpConnectionConfig: AmqpConnectorConfig
     fun shutdown(): Outcome<AmqpConnectionError, Unit>
+    val connected: Boolean
 }
 
 sealed interface PublishingAmqpConnector: AmqpConnector {
@@ -25,6 +26,8 @@ class PublishingAmqpConnectorImpl(
     override fun shutdown(): Outcome<AmqpConnectionError, Unit> = runCatching(connectionClosingErrorProducer) {
         publishingConnection.close()
     }
+
+    override val connected: Boolean get() = publishingConnection.isOpen()
 }
 
 class ConsumingAmqpConnectorImpl(
@@ -34,6 +37,8 @@ class ConsumingAmqpConnectorImpl(
     override fun shutdown(): Outcome<AmqpConnectionError, Unit> = runCatching(connectionClosingErrorProducer) {
         consumingConnection.close()
     }
+
+    override val connected: Boolean get() = consumingConnection.isOpen()
 }
 
 class PublishingConsumingAmqpConnectorImpl(
@@ -45,6 +50,8 @@ class PublishingConsumingAmqpConnectorImpl(
         publishingConnection.close()
         consumingConnection.close()
     }
+
+    override val connected: Boolean get() = publishingConnection.isOpen() && consumingConnection.isOpen()
 }
 
 internal val connectionClosingErrorProducer: (Exception) -> AmqpConnectionError =

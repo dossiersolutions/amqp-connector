@@ -18,4 +18,5 @@ actual class Connection(private val rmqConnection: Connection, private val execu
         return Channel(rmqConnection.createChannel())
     }
 
+    actual fun isOpen(): Boolean = rmqConnection.isOpen
 }
