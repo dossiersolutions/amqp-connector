@@ -25,11 +25,13 @@ amqp-connector is a RabbitMQ/AMQP client library relying on the official [Rabbit
 ## Getting started
 1. Add the amqp-connector dependency to your Gradle build script
 
-       implementation("no.dossier.libraries:amqp-connector:0.1.0")
+    ``` groovy
+    implementation("no.dossier.libraries:amqp-connector:0.1.0")
+    ```
 
 3. Create an instance of the connector using dedicated Kotlin DSL and start publishing and/or consuming messages
 
-    ```
+    ``` kotlin
     class ExampleResource {
        val connector = connector(role = PublisherAndConsumer) {
            connectionString = "amqp://guest:guest@localhost:5672/"
